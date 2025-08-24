@@ -106,7 +106,9 @@ To use different custom fields, modify the `START_DATE_FIELD` and `END_DATE_FIEL
 
 ### Frontend (HTML/JavaScript)
 
-- **`index.html`**: Single-page application with embedded CSS and JavaScript
+- **`index.html`**: Main HTML page with form controls and layout structure
+- **`styles.css`**: CSS styling for the application layout and components
+- **`script.js`**: JavaScript application logic for graph interaction and data fetching
 - **Cytoscape.js**: Graph visualization library
 - **Dagre**: Layout algorithm for hierarchical graphs
 - **HTML Labels**: Custom rendering for issue cards

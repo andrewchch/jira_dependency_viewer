@@ -4,7 +4,8 @@ import sys
 
 from typing import List, Optional, Dict, Any, Set, Tuple
 from fastapi import FastAPI, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from jira import JIRA
 
@@ -34,6 +35,17 @@ JIRA_FIELDS = ",".join([
 # FastAPI app
 # -------------
 app = FastAPI(title="Jira Dependency Graph")
+
+# Serve static files
+@app.get("/styles.css")
+def get_styles():
+    styles_path = os.path.join(os.path.dirname(__file__), "styles.css")
+    return FileResponse(styles_path, media_type="text/css")
+
+@app.get("/script.js")
+def get_script():
+    script_path = os.path.join(os.path.dirname(__file__), "script.js")
+    return FileResponse(script_path, media_type="application/javascript")
 
 # Lazy Jira client
 _jira_client: Optional[JIRA] = None
