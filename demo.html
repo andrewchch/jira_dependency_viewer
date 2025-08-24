@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Jira Dependency Graph - Visual Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      padding: 20px;
+      background: #f5f7fa;
+    }
+    .demo-section {
+      margin: 20px 0;
+      padding: 20px;
+      background: white;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+    }
+    .ticket {
+      width: 220px; background: #fff; border: 1px solid #d0d7de; border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.08); padding: 10px 12px; font-size: 12px;
+      margin: 10px;
+      display: inline-block;
+      vertical-align: top;
+    }
+    .ticket.original {
+      border: 3px solid #0052cc; /* Thicker border for original query tickets */
+    }
+    .ticket .key { color:#0052cc; font-weight:700; margin-bottom:4px; display:inline-block; }
+    .ticket .summary { font-size:13px; margin-bottom:8px; }
+    .ticket .dates { color:#667085; font-size:11px; margin-bottom:8px; }
+    .ticket .status {
+      display:inline-block; font-size:11px; font-weight:700;
+      padding:2px 6px; border-radius:6px; background:#e7f1ff; color:#0b63c7;
+    }
+    .arrow {
+      display: inline-block;
+      margin: 0 10px;
+      color: #1d70b8;
+      font-weight: bold;
+      font-size: 20px;
+    }
+    h2 {
+      color: #1d70b8;
+      border-bottom: 2px solid #1d70b8;
+      padding-bottom: 10px;
+    }
+    .explanation {
+      background: #f0f8ff;
+      padding: 15px;
+      border-radius: 8px;
+      border-left: 4px solid #1d70b8;
+      margin: 15px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Jira Dependency Viewer - Enhanced with Linked Tickets</h1>
+  
+  <div class="explanation">
+    <strong>New Feature:</strong> The application now fetches tickets linked via "blocks" or "is blocked by" dependencies 
+    and highlights original query results with thicker borders.
+  </div>
+
+  <div class="demo-section">
+    <h2>Before Enhancement (Old Behavior)</h2>
+    <p>Previously, only tickets matching the search query were shown, even if they had blocking dependencies to other tickets.</p>
+    
+    <div class="ticket">
+      <div class="key">PROJ-1</div>
+      <div class="summary">Original Issue 1</div>
+      <div class="dates">Start: 2024-01-01 &nbsp;&nbsp; End: 2024-01-31</div>
+      <span class="status">In Progress</span>
+    </div>
+    
+    <div class="ticket">
+      <div class="key">PROJ-2</div>
+      <div class="summary">Original Issue 2</div>
+      <div class="dates">Start: 2024-02-01 &nbsp;&nbsp; End: 2024-02-28</div>
+      <span class="status">In Progress</span>
+    </div>
+    
+    <p><em>Missing: PROJ-3 and PROJ-4 which have blocking relationships with the above tickets</em></p>
+  </div>
+
+  <div class="demo-section">
+    <h2>After Enhancement (New Behavior)</h2>
+    <p>Now shows both original query results (thick blue border) and linked tickets with blocking dependencies (thin gray border).</p>
+    
+    <div style="display: flex; align-items: center; flex-wrap: wrap;">
+      <div class="ticket original">
+        <div class="key">PROJ-1</div>
+        <div class="summary">Original Issue 1</div>
+        <div class="dates">Start: 2024-01-01 &nbsp;&nbsp; End: 2024-01-31</div>
+        <span class="status">In Progress</span>
+      </div>
+      
+      <span class="arrow">→ blocks →</span>
+      
+      <div class="ticket">
+        <div class="key">PROJ-3</div>
+        <div class="summary">Linked Issue 3</div>
+        <div class="dates">Start: 2024-03-01 &nbsp;&nbsp; End: 2024-03-31</div>
+        <span class="status">To Do</span>
+      </div>
+    </div>
+    
+    <div style="display: flex; align-items: center; flex-wrap: wrap; margin-top: 20px;">
+      <div class="ticket">
+        <div class="key">PROJ-4</div>
+        <div class="summary">Linked Issue 4</div>
+        <div class="dates">Start: 2024-01-15 &nbsp;&nbsp; End: 2024-02-15</div>
+        <span class="status">Done</span>
+      </div>
+      
+      <span class="arrow">→ blocks →</span>
+      
+      <div class="ticket original">
+        <div class="key">PROJ-2</div>
+        <div class="summary">Original Issue 2</div>
+        <div class="dates">Start: 2024-02-01 &nbsp;&nbsp; End: 2024-02-28</div>
+        <span class="status">In Progress</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="demo-section">
+    <h2>Key Improvements</h2>
+    <ul>
+      <li><strong>Complete Dependency Graph:</strong> Shows the full picture of blocking relationships</li>
+      <li><strong>Visual Distinction:</strong> Original query tickets have thick blue borders (3px)</li>
+      <li><strong>Linked Tickets:</strong> Related tickets with blocking dependencies are automatically included</li>
+      <li><strong>Better Understanding:</strong> Teams can see what's blocking their work or what their work blocks</li>
+    </ul>
+  </div>
+
+  <div class="demo-section">
+    <h2>Technical Implementation</h2>
+    <ul>
+      <li><strong>Backend:</strong> Modified API to fetch linked issues after initial query</li>
+      <li><strong>Data Structure:</strong> Added <code>isOriginal</code> field to distinguish ticket types</li>
+      <li><strong>Frontend:</strong> Updated CSS and JavaScript to apply visual styling</li>
+      <li><strong>Error Handling:</strong> Gracefully handles inaccessible linked tickets</li>
+    </ul>
+  </div>
+
+</body>
+</html>

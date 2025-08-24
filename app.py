@@ -47,6 +47,11 @@ def get_script():
     script_path = os.path.join(os.path.dirname(__file__), "script.js")
     return FileResponse(script_path, media_type="application/javascript")
 
+@app.get("/demo")
+def get_demo():
+    demo_path = os.path.join(os.path.dirname(__file__), "demo.html")
+    return FileResponse(demo_path, media_type="text/html")
+
 # Lazy Jira client
 _jira_client: Optional[JIRA] = None
 def jira_client() -> JIRA:
@@ -121,8 +126,10 @@ def api_search(
             break
         start_at += len(batch)
 
-    # Build nodes
+    # Build nodes from original query results
     nodes_by_key: Dict[str, Dict[str, Any]] = {}
+    original_keys = set()
+    
     for issue in fetched:
         fields = issue.fields
         key = issue.key
@@ -138,11 +145,74 @@ def api_search(
             "start": start or "-",
             "end": end or "-",
             "url": f"{JIRA_SERVER.rstrip('/')}/browse/{key}",
+            "isOriginal": True,  # Mark as original query result
         }
+        original_keys.add(key)
+    
+    # Collect linked issue keys that have blocking relationships
+    linked_keys = set()
+    for issue in fetched:
+        key = issue.key
+        links = getattr(issue.fields, "issuelinks", []) or []
+        for link in links:
+            lt = getattr(link, "type", None)
+            if not lt:
+                continue
+
+            # Normalize names, Jira typically has name="Blocks", outward="blocks", inward="is blocked by"
+            name = (lt.name or "").lower()
+            outward = (lt.outward or "").lower()
+            inward = (lt.inward or "").lower()
+
+            # Check for outward blocking relationships
+            if hasattr(link, "outwardIssue") and link.outwardIssue:
+                other_key = link.outwardIssue.key
+                if (name == "blocks" or outward == "blocks") and other_key not in original_keys:
+                    linked_keys.add(other_key)
+
+            # Check for inward blocking relationships  
+            if hasattr(link, "inwardIssue") and link.inwardIssue:
+                other_key = link.inwardIssue.key
+                if (name == "blocks" or inward == "is blocked by") and other_key not in original_keys:
+                    linked_keys.add(other_key)
+    
+    # Fetch details for linked issues
+    linked_issues = []
+    if linked_keys:
+        for linked_key in linked_keys:
+            try:
+                linked_issue = client.issue(linked_key, fields=JIRA_FIELDS)
+                linked_issues.append(linked_issue)
+            except Exception as e:
+                # Skip issues we can't access
+                sys.stderr.write(f"Could not fetch linked issue {linked_key}: {e}\n")
+                continue
+        
+        # Add linked issues as nodes
+        for issue in linked_issues:
+            fields = issue.fields
+            key = issue.key
+            start = getattr(fields, START_DATE_FIELD, None)
+            end = getattr(fields, END_DATE_FIELD, None)
+            status = fields.status.name if getattr(fields, "status", None) else None
+
+            nodes_by_key[key] = {
+                "id": key,
+                "key": key,
+                "summary": fields.summary,
+                "status": status or "-",
+                "start": start or "-",
+                "end": end or "-",
+                "url": f"{JIRA_SERVER.rstrip('/')}/browse/{key}",
+                "isOriginal": False,  # Mark as linked issue
+            }
 
     # Build edges from "blocks" links (current → other means current blocks other)
+    # Now we need to check all issues (original + linked) for their relationships
     edges_set: Set[Tuple[str, str, str]] = set()
-    for issue in fetched:
+    all_issues = fetched + linked_issues
+    
+    for issue in all_issues:
         key = issue.key
         links = getattr(issue.fields, "issuelinks", []) or []
         for link in links:
