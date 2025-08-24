@@ -47,6 +47,11 @@ def get_script():
     script_path = os.path.join(os.path.dirname(__file__), "script.js")
     return FileResponse(script_path, media_type="application/javascript")
 
+@app.get("/demo")
+def get_demo():
+    demo_path = os.path.join(os.path.dirname(__file__), "demo.html")
+    return FileResponse(demo_path, media_type="text/html")
+
 # Lazy Jira client
 _jira_client: Optional[JIRA] = None
 def jira_client() -> JIRA:
