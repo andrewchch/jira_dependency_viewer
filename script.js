@@ -40,7 +40,7 @@ function buildCy() {
     query: 'node',
     halign: 'center', valign: 'center', halignBox: 'center', valignBox: 'center',
     tpl: (d) => `
-      <div class="ticket">
+      <div class="ticket${d.isOriginal ? ' original' : ''}">
         <div class="key">${d.key}</div>
         <div class="summary">${d.summary || ""}</div>
         <div class="dates">Start: ${d.start || '-'} &nbsp;&nbsp; End: ${d.end || '-'}</div>
