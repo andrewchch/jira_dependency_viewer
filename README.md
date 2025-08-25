@@ -6,7 +6,7 @@ A web-based tool for visualizing Jira issue dependencies as interactive graphs. 
 
 - **Interactive Dependency Graphs**: Visualize Jira issues and their "blocks" relationships using Cytoscape.js
 - **Multiple Search Options**: Search by project key, text, status, or custom JQL queries
-- **Flexible Layouts**: Choose between grid and flow (left-to-right) layouts for optimal visualization
+- **Flexible Layouts**: Choose between grid, flow (left-to-right), and Gantt chart layouts for optimal visualization
 - **Issue Details**: Each issue displays key, summary, start/end dates, and current status
 - **Direct Jira Integration**: Click any issue card to open it directly in Jira
 - **Real-time Data**: Fetches live data from your Jira instance via REST API
@@ -88,6 +88,7 @@ To use different custom fields, modify the `START_DATE_FIELD` and `END_DATE_FIEL
 
 - **Grid Layout**: Arranges issues in a regular grid pattern
 - **Flow Layout (L→R)**: Displays dependencies in a left-to-right flow diagram showing dependency chains
+- **Gantt Chart**: Timeline view showing tasks with durations based on story points and dependency relationships
 
 ### Interacting with the Graph
 
@@ -95,6 +96,21 @@ To use different custom fields, modify the `START_DATE_FIELD` and `END_DATE_FIEL
 - **Pan**: Click and drag to move around the graph
 - **Open Issues**: Click any issue card to open it in Jira
 - **Hover Effects**: Hover over issues for visual feedback
+
+### Gantt Chart Features
+
+The Gantt chart view provides timeline-based project visualization:
+
+- **Story Point Duration Mapping**:
+  - 1 point = 1 day
+  - 2 points = 2 days  
+  - 3 points = 3 days
+  - 5 points = 5 days
+  - 8 points = 10 days
+  - 13 points = 20 days
+- **Dependency Visualization**: Shows blocking relationships between tasks
+- **Progress Indicators**: Visual progress based on ticket status (Done=100%, In Progress=50%, others=0%)
+- **Timeline View**: Displays tasks along a calendar timeline with proper scheduling
 
 ## Architecture
 
@@ -110,6 +126,7 @@ To use different custom fields, modify the `START_DATE_FIELD` and `END_DATE_FIEL
 - **`styles.css`**: CSS styling for the application layout and components
 - **`script.js`**: JavaScript application logic for graph interaction and data fetching
 - **Cytoscape.js**: Graph visualization library
+- **dhtmlxGantt**: Gantt chart visualization library for timeline views
 - **Dagre**: Layout algorithm for hierarchical graphs
 - **HTML Labels**: Custom rendering for issue cards
 
@@ -120,7 +137,7 @@ To use different custom fields, modify the `START_DATE_FIELD` and `END_DATE_FIEL
 3. Backend queries Jira API using provided credentials
 4. Issue data is processed to create nodes and dependency edges
 5. Graph data is returned as JSON to the frontend
-6. Cytoscape.js renders the interactive graph
+6. Cytoscape.js or dhtmlxGantt renders the interactive visualization
 
 ## API Reference
 
