@@ -9,7 +9,7 @@ html, body { height: 100%; margin: 0; background:#f5f7fa; font-family: system-ui
   font-size: 14px; padding: 8px 10px; border:1px solid #d0d7de; border-radius: 8px; background:#fff;
 }
 .toolbar button.primary { background: var(--blue); color:#fff; border-color: var(--blue); cursor: pointer; }
-#cy { width: 100%; height: 100%; }
+#cy { width: 100%; height: 100%; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; }
 .cy-node-html-label { position: absolute; z-index: 9999 !important; pointer-events: none; }
 
 .ticket {
@@ -46,4 +46,31 @@ html, body { height: 100%; margin: 0; background:#f5f7fa; font-family: system-ui
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* Gantt chart container styling */
+#gantt_here {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+/* Gantt placeholder styling */
+#gantt_here .gantt-placeholder {
+  padding: 40px;
+  text-align: center;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+#gantt_here .gantt-placeholder h2 {
+  color: #1d70b8;
+  margin-bottom: 16px;
+}
+
+#gantt_here .gantt-placeholder ul {
+  text-align: left;
+  max-width: 500px;
+  margin: 16px auto;
+  list-style-type: disc;
+  padding-left: 20px;
 }

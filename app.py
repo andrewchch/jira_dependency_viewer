@@ -19,6 +19,8 @@ JIRA_API_TOKEN = os.getenv("JIRA_API_TOKEN")
 # "Start date" / "End date" are often custom fields in Jira.
 START_DATE_FIELD = "customfield_10015"
 END_DATE_FIELD   = "customfield_10016"
+# Story points is typically a custom field in Jira
+STORY_POINTS_FIELD = "customfield_10002"
 
 # Fields we’ll ask Jira for (add as needed)
 JIRA_FIELDS = ",".join([
@@ -28,7 +30,8 @@ JIRA_FIELDS = ",".join([
     "issuelinks",
     START_DATE_FIELD,
     END_DATE_FIELD,
-    "duedate"
+    "duedate",
+    STORY_POINTS_FIELD
 ])
 
 # -------------
@@ -135,6 +138,7 @@ def api_search(
         key = issue.key
         start = getattr(fields, START_DATE_FIELD, None)
         end = getattr(fields, END_DATE_FIELD, None)
+        story_points = getattr(fields, STORY_POINTS_FIELD, None)
         status = fields.status.name if getattr(fields, "status", None) else None
 
         nodes_by_key[key] = {
@@ -144,6 +148,7 @@ def api_search(
             "status": status or "-",
             "start": start or "-",
             "end": end or "-",
+            "story_points": story_points,
             "url": f"{JIRA_SERVER.rstrip('/')}/browse/{key}",
             "isOriginal": True,  # Mark as original query result
         }
@@ -194,6 +199,7 @@ def api_search(
             key = issue.key
             start = getattr(fields, START_DATE_FIELD, None)
             end = getattr(fields, END_DATE_FIELD, None)
+            story_points = getattr(fields, STORY_POINTS_FIELD, None)
             status = fields.status.name if getattr(fields, "status", None) else None
 
             nodes_by_key[key] = {
@@ -203,6 +209,7 @@ def api_search(
                 "status": status or "-",
                 "start": start or "-",
                 "end": end or "-",
+                "story_points": story_points,
                 "url": f"{JIRA_SERVER.rstrip('/')}/browse/{key}",
                 "isOriginal": False,  # Mark as linked issue
             }
