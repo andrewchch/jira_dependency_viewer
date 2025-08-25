@@ -69,13 +69,19 @@ function buildCy() {
   cy.nodeHtmlLabel([{
     query: 'node',
     halign: 'center', valign: 'center', halignBox: 'center', valignBox: 'center',
-    tpl: (d) => `
-      <div class="ticket${d.isOriginal ? ' original' : ''}">
-        <div class="key">${d.key}</div>
-        <div class="summary">${d.summary || ""}</div>
-        <div class="dates">Start: ${d.start || '-'} &nbsp;&nbsp; End: ${d.end || '-'}</div>
-        <span class="status">${d.status || '-'}</span>
-      </div>`
+    tpl: (d) => {
+      let cssClass = 'ticket';
+      if (d.isOriginal) cssClass += ' original';
+      if (d.isHighlighted) cssClass += ' highlighted';
+      
+      return `
+        <div class="${cssClass}">
+          <div class="key">${d.key}</div>
+          <div class="summary">${d.summary || ""}</div>
+          <div class="dates">Start: ${d.start || '-'} &nbsp;&nbsp; End: ${d.end || '-'}</div>
+          <span class="status">${d.status || '-'}</span>
+        </div>`;
+    }
   }]);
 
   // Click → open JIRA
@@ -204,6 +210,16 @@ function transformDataForGantt(nodes, edges) {
 
   const tasks = nodes.map(node => {
     const { start, duration } = calcDates(node.id);
+    
+    // Determine color based on highlight status
+    let color = '#666666';  // Default for linked issues
+    if (node.isOriginal) {
+      color = '#0052cc';  // Blue for original query results
+    }
+    if (node.isHighlighted) {
+      color = '#ff6b35';  // Orange/red for highlighted tickets
+    }
+    
     return {
       id: node.id,
       text: `${node.key}: ${node.summary}`,
@@ -211,7 +227,7 @@ function transformDataForGantt(nodes, edges) {
       duration: duration,
       progress: node.status === 'Done' ? 1 : (node.status === 'In Progress' ? 0.5 : 0),
       $open: true,
-      color: node.isOriginal ? '#0052cc' : '#666666'
+      color: color
     };
   });
 
@@ -248,14 +264,19 @@ async function doSearch() {
   spinner.style.display = 'flex';  // show spinner
 
   try {
-    const project = document.getElementById('project').value.trim();
-    const text = document.getElementById('text').value.trim();
-    const statuses = document.getElementById('statuses').value.trim();
     const jql = document.getElementById('jql').value.trim();
+    const highlightJql = document.getElementById('highlightJql').value.trim();
     const maxResults = document.getElementById('maxResults').value || '50';
     const layoutName = document.getElementById('layout').value;
 
-    const graph = await fetchGraph({ project, text, statuses, jql, max_results: maxResults });
+    const params = { 
+      max_results: maxResults
+    };
+    
+    if (jql) params.jql = jql;
+    if (highlightJql) params.highlight_jql = highlightJql;
+
+    const graph = await fetchGraph(params);
 
     // Reset graph
     cy.elements().remove();
