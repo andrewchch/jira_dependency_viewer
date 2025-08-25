@@ -158,6 +158,8 @@ function initializeGantt() {
   gantt.config.subscales = [
     {unit:"day", step:1, date:"%j, %D"}
   ];
+  gantt.config.autosize = false;   // turn off horizontal autosize
+  gantt.config.fit_tasks = false;  // don’t auto-fit scale to tasks
   
   // Enable auto-scheduling and dependencies
   gantt.config.auto_scheduling = true;
@@ -169,46 +171,57 @@ function initializeGantt() {
 
 function transformDataForGantt(nodes, edges) {
   const today = new Date();
-  const tasks = [];
-  const links = [];
-  
-  nodes.forEach((node, index) => {
-    const duration = storyPointsToDuration(node.story_points);
-    
-    // Calculate start date - use provided start date or default to today
+  const nodeMap = {};
+  nodes.forEach(n => nodeMap[n.id] = n);
+
+  // Build adjacency list for dependencies
+  const dependencies = {};
+  nodes.forEach(n => dependencies[n.id] = []);
+  edges.forEach(e => dependencies[e.target].push(e.source));
+
+  // Store calculated dates
+  const dates = {};
+
+  function calcDates(id) {
+    if (dates[id]) return dates[id];
+    const duration = storyPointsToDuration(nodeMap[id].story_points);
+
+    // Find latest end date among dependencies
     let startDate = today;
-    if (node.start && node.start !== '-') {
-      const parsedStart = new Date(node.start);
-      if (!isNaN(parsedStart.getTime())) {
-        startDate = parsedStart;
-      }
+    if (dependencies[id].length > 0) {
+      let maxEnd = today;
+      dependencies[id].forEach(depId => {
+        const depDates = calcDates(depId);
+        if (depDates.end > maxEnd) maxEnd = depDates.end;
+      });
+      startDate = new Date(maxEnd);
     }
-    
-    // Calculate end date based on duration
     const endDate = new Date(startDate);
     endDate.setDate(endDate.getDate() + duration);
-    
-    tasks.push({
+    dates[id] = { start: startDate, end: endDate, duration: duration };
+    return dates[id];
+  }
+
+  const tasks = nodes.map(node => {
+    const { start, duration } = calcDates(node.id);
+    return {
       id: node.id,
       text: `${node.key}: ${node.summary}`,
-      start_date: startDate,
+      start_date: start,
       duration: duration,
       progress: node.status === 'Done' ? 1 : (node.status === 'In Progress' ? 0.5 : 0),
       $open: true,
       color: node.isOriginal ? '#0052cc' : '#666666'
-    });
+    };
   });
-  
-  // Add dependency links
-  edges.forEach((edge, index) => {
-    links.push({
-      id: index + 1,
-      source: edge.source,
-      target: edge.target,
-      type: "0" // finish-to-start dependency
-    });
-  });
-  
+
+  const links = edges.map((edge, index) => ({
+    id: index + 1,
+    source: edge.source,
+    target: edge.target,
+    type: "0"
+  }));
+
   return { data: tasks, links: links };
 }
 

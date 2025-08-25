@@ -20,7 +20,7 @@ JIRA_API_TOKEN = os.getenv("JIRA_API_TOKEN")
 START_DATE_FIELD = "customfield_10015"
 END_DATE_FIELD   = "customfield_10016"
 # Story points is typically a custom field in Jira
-STORY_POINTS_FIELD = "customfield_10002"
+STORY_POINTS_FIELD = "customfield_10005"
 
 # Fields we’ll ask Jira for (add as needed)
 JIRA_FIELDS = ",".join([
@@ -88,7 +88,7 @@ def build_jql(
         if quoted:
             parts.append(f"status in ({quoted})")
     # Only include issues you can browse; add any extra constraints you need
-    return " AND ".join(parts) if parts else "ORDER BY updated DESC"
+    return " AND ".join(parts) if parts else "ORDER BY rank DESC"
 
 # --------------------
 # API response models
