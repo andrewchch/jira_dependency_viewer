@@ -1,6 +1,41 @@
 let cy;
 let ganttInitialized = false;
 
+// Cookie utilities for persisting form values
+function setCookie(name, value, days = 30) {
+  const expires = new Date();
+  expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+  document.cookie = `${name}=${encodeURIComponent(value)};expires=${expires.toUTCString()};path=/`;
+}
+
+function getCookie(name) {
+  const nameEQ = name + "=";
+  const ca = document.cookie.split(';');
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) === 0) return decodeURIComponent(c.substring(nameEQ.length, c.length));
+  }
+  return null;
+}
+
+function saveFormValueToCookie(elementId) {
+  const element = document.getElementById(elementId);
+  if (element) {
+    setCookie(`jira_${elementId}`, element.value);
+  }
+}
+
+function loadFormValueFromCookie(elementId) {
+  const value = getCookie(`jira_${elementId}`);
+  if (value !== null) {
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.value = value;
+    }
+  }
+}
+
 // Story points to duration mapping (in days)
 function storyPointsToDuration(storyPoints) {
   if (storyPoints == null || storyPoints === 0) return 1; // Default to 1 day if no story points
@@ -269,6 +304,12 @@ async function doSearch() {
     const maxResults = document.getElementById('maxResults').value || '50';
     const layoutName = document.getElementById('layout').value;
 
+    // Save current form values to cookies
+    saveFormValueToCookie('jql');
+    saveFormValueToCookie('highlightJql');
+    saveFormValueToCookie('maxResults');
+    saveFormValueToCookie('layout');
+
     const params = { 
       max_results: maxResults
     };
@@ -298,10 +339,28 @@ async function doSearch() {
 
 // UI wiring
 document.getElementById('searchBtn').addEventListener('click', doSearch);
-document.getElementById('layout').addEventListener('change', () => runLayout(document.getElementById('layout').value));
+document.getElementById('layout').addEventListener('change', () => {
+  const layoutName = document.getElementById('layout').value;
+  saveFormValueToCookie('layout');
+  runLayout(layoutName);
+});
+
+// Add event listeners to save form values to cookies
+document.getElementById('jql').addEventListener('input', () => saveFormValueToCookie('jql'));
+document.getElementById('highlightJql').addEventListener('input', () => saveFormValueToCookie('highlightJql'));
+document.getElementById('maxResults').addEventListener('input', () => saveFormValueToCookie('maxResults'));
+
+// Load saved form values from cookies on page load
+function loadSavedFormValues() {
+  loadFormValueFromCookie('jql');
+  loadFormValueFromCookie('highlightJql');
+  loadFormValueFromCookie('layout');
+  loadFormValueFromCookie('maxResults');
+}
 
 // Boot
 buildCy();
+loadSavedFormValues(); // Load saved values after page loads
 // Optional: set some defaults so first search works quickly
 // document.getElementById('project').value = 'NSE';
 // doSearch();
