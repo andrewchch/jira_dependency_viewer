@@ -17,7 +17,11 @@ html, body { height: 100%; margin: 0; background:#f5f7fa; font-family: system-ui
   box-shadow: 0 2px 6px rgba(0,0,0,.08); padding: 10px 12px; font-size: 12px;
 }
 .ticket.original {
-  border: 3px solid red; /* Thicker border for original query tickets */
+  border: 3px solid #0052cc; /* Thicker blue border for original query tickets */
+}
+.ticket.highlighted {
+  border: 3px solid #ff6b35; /* Orange border for highlighted tickets */
+  background: #fff5f0; /* Light orange background */
 }
 .ticket .key { color:#0052cc; font-weight:700; margin-bottom:4px; display:inline-block; }
 .ticket .summary { font-size:13px; margin-bottom:8px; }

@@ -68,31 +68,8 @@ def jira_client() -> JIRA:
     return _jira_client
 
 # -------------------
-# JQL builder helper
-# -------------------
-def build_jql(
-    project: Optional[str],
-    text: Optional[str],
-    statuses: Optional[List[str]],
-) -> str:
-    parts: List[str] = []
-    if project:
-        parts.append(f'project = "{project}"')
-    if text:
-        # Search summary/description (adjust to taste)
-        # phrase search if spaces
-        q = text.replace('"', '\\"')
-        parts.append(f'text ~ "{q}"')
-    if statuses:
-        quoted = ", ".join([f'"{s}"' for s in statuses if s.strip()])
-        if quoted:
-            parts.append(f"status in ({quoted})")
-    # Only include issues you can browse; add any extra constraints you need
-    return " AND ".join(parts) if parts else "ORDER BY rank DESC"
-
-# --------------------
 # API response models
-# --------------------
+# -------------------
 class Graph(BaseModel):
     nodes: List[Dict[str, Any]]
     edges: List[Dict[str, Any]]
@@ -102,17 +79,14 @@ class Graph(BaseModel):
 # ----------------
 @app.get("/api/search", response_model=Graph)
 def api_search(
-    project: Optional[str] = Query(None, description="Jira project key, e.g. NSE"),
-    text: Optional[str] = Query(None, description="Free text search"),
-    statuses: Optional[str] = Query(None, description='Comma-separated statuses, e.g. "In Progress,Analysis"'),
-    jql: Optional[str] = Query(None, description="Raw JQL (overrides other filters)"),
+    jql: Optional[str] = Query(None, description="Main JQL query"),
+    highlight_jql: Optional[str] = Query(None, description="Highlight JQL query (tickets matching this will be highlighted)"),
     max_results: int = Query(50, ge=1, le=500),
 ) -> JSONResponse:
-    # Build JQL
-    status_list = [s.strip() for s in (statuses or "").split(",")] if statuses else None
-    query_jql = jql if jql else build_jql(project, text, status_list)
+    # Build JQL - now we only use the main jql parameter
+    query_jql = jql if jql else "ORDER BY rank DESC"
 
-    sys.stderr.write("%s\n" % query_jql)
+    sys.stderr.write(f"Main JQL: {query_jql}\n")
 
     # Query Jira (paginate if needed)
     client = jira_client()
@@ -128,6 +102,22 @@ def api_search(
         if len(fetched) >= max_results or len(batch) == 0:
             break
         start_at += len(batch)
+
+    # Execute highlight JQL query if provided to get highlighted ticket keys
+    highlighted_keys = set()
+    if highlight_jql:
+        try:
+            sys.stderr.write(f"Highlight JQL: {highlight_jql}\n")
+            highlight_results = client.enhanced_search_issues(
+                jql_str=highlight_jql,
+                maxResults=1000,  # Get a reasonable number of highlight results
+                fields="key",  # We only need the keys for highlighting
+            )
+            highlighted_keys = {issue.key for issue in highlight_results}
+            sys.stderr.write(f"Found {len(highlighted_keys)} tickets to highlight\n")
+        except Exception as e:
+            sys.stderr.write(f"Error executing highlight JQL: {e}\n")
+            # Continue without highlighting if the query fails
 
     # Build nodes from original query results
     nodes_by_key: Dict[str, Dict[str, Any]] = {}
@@ -151,6 +141,7 @@ def api_search(
             "story_points": story_points,
             "url": f"{JIRA_SERVER.rstrip('/')}/browse/{key}",
             "isOriginal": True,  # Mark as original query result
+            "isHighlighted": key in highlighted_keys,  # Mark if ticket should be highlighted
         }
         original_keys.add(key)
     
@@ -212,6 +203,7 @@ def api_search(
                 "story_points": story_points,
                 "url": f"{JIRA_SERVER.rstrip('/')}/browse/{key}",
                 "isOriginal": False,  # Mark as linked issue
+                "isHighlighted": key in highlighted_keys,  # Mark if ticket should be highlighted
             }
 
     # Build edges from "blocks" links (current → other means current blocks other)
