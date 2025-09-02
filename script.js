@@ -202,6 +202,13 @@ function initializeGantt() {
   gantt.config.autosize = false;   // turn off horizontal autosize
   gantt.config.fit_tasks = false;  // don’t auto-fit scale to tasks
   
+  // Configure columns to make task name column resizable
+  gantt.config.columns = [
+    {name: "text", label: "Task Name", width: 250, resize: true, tree: true},
+    {name: "start_date", label: "Start Date", width: 80, resize: true},
+    {name: "duration", label: "Duration", width: 60, resize: true}
+  ];
+  
   // Enable auto-scheduling and dependencies
   gantt.config.auto_scheduling = true;
   gantt.config.auto_scheduling_strict = true;
