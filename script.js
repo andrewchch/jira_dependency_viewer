@@ -109,12 +109,19 @@ function buildCy() {
       if (d.isOriginal) cssClass += ' original';
       if (d.isHighlighted) cssClass += ' highlighted';
       
+      // Escape HTML for tooltip content
+      const fullSummary = (d.summary || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      const tooltipContent = `<strong>${d.key}</strong><br>${fullSummary}`;
+      
       return `
-        <div class="${cssClass}">
-          <div class="key">${d.key}</div>
-          <div class="summary">${d.summary || ""}</div>
-          <div class="dates">Start: ${d.start || '-'} &nbsp;&nbsp; End: ${d.end || '-'}</div>
-          <span class="status">${d.status || '-'}</span>
+        <div class="tooltip">
+          <div class="${cssClass}">
+            <div class="key">${d.key}</div>
+            <div class="summary">${d.summary || ""}</div>
+            <div class="dates">Start: ${d.start || '-'} &nbsp;&nbsp; End: ${d.end || '-'}</div>
+            <span class="status">${d.status || '-'}</span>
+          </div>
+          <span class="tooltiptext">${tooltipContent}</span>
         </div>`;
     }
   }]);
@@ -205,6 +212,14 @@ function initializeGantt() {
   // Enable auto-scheduling and dependencies
   gantt.config.auto_scheduling = true;
   gantt.config.auto_scheduling_strict = true;
+  
+  // Configure tooltips for Gantt chart
+  gantt.templates.tooltip_text = function(start, end, task) {
+    return `<b>${task.text}</b><br/>
+            Duration: ${task.duration} day(s)<br/>
+            Progress: ${Math.round(task.progress * 100)}%<br/>
+            ${gantt.templates.tooltip_date_format(start)} - ${gantt.templates.tooltip_date_format(end)}`;
+  };
   
   // Initialize the gantt chart
   gantt.init("gantt_here");
