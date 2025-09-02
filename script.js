@@ -212,8 +212,12 @@ function initializeGantt() {
   // Enable auto-scheduling and dependencies
   gantt.config.auto_scheduling = true;
   gantt.config.auto_scheduling_strict = true;
-  
+
   // Configure tooltips for Gantt chart
+  gantt.plugins({
+        tooltip: true
+    });
+  
   gantt.templates.tooltip_text = function(start, end, task) {
     return `<b>${task.text}</b><br/>
             Duration: ${task.duration} day(s)<br/>
