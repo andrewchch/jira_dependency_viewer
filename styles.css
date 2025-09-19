@@ -2,13 +2,25 @@
 html, body { height: 100%; margin: 0; background:#f5f7fa; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
 .app { display: grid; grid-template-rows: auto 1fr; height: 100%; }
 .toolbar {
-  display: grid; grid-template-columns: repeat(6, minmax(160px, 1fr)) auto; gap: 8px;
+  display: grid; grid-template-columns: repeat(5, minmax(160px, 1fr)) 250px auto; gap: 8px;
   padding: 10px; background:#fff; border-bottom:1px solid #e5e7eb; align-items: center;
 }
 .toolbar input, .toolbar select, .toolbar button {
   font-size: 14px; padding: 8px 10px; border:1px solid #d0d7de; border-radius: 8px; background:#fff;
 }
 .toolbar button.primary { background: var(--blue); color:#fff; border-color: var(--blue); cursor: pointer; }
+
+/* Checkbox styling */
+.checkbox-container {
+  display: flex; align-items: center; font-size: 14px; cursor: pointer;
+  user-select: none;
+}
+.checkbox-container input[type="checkbox"] {
+  margin-right: 8px; cursor: pointer;
+}
+.checkbox-container .checkmark {
+  /* We'll use the default checkbox for simplicity */
+}
 #cy { width: 100%; height: 100%; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; }
 .cy-node-html-label { position: absolute; z-index: 9999 !important; pointer-events: none; }
 

@@ -22,7 +22,11 @@ function getCookie(name) {
 function saveFormValueToCookie(elementId) {
   const element = document.getElementById(elementId);
   if (element) {
-    setCookie(`jira_${elementId}`, element.value);
+    if (element.type === 'checkbox') {
+      setCookie(`jira_${elementId}`, element.checked ? 'true' : 'false');
+    } else {
+      setCookie(`jira_${elementId}`, element.value);
+    }
   }
 }
 
@@ -31,7 +35,11 @@ function loadFormValueFromCookie(elementId) {
   if (value !== null) {
     const element = document.getElementById(elementId);
     if (element) {
-      element.value = value;
+      if (element.type === 'checkbox') {
+        element.checked = value === 'true';
+      } else {
+        element.value = value;
+      }
     }
   }
 }
@@ -90,6 +98,25 @@ function buildCy() {
           'edge-text-rotation': 'autorotate',
           'font-size': 11,
           'color': '#1d70b8',
+          'text-background-color': '#fff',
+          'text-background-opacity': 1,
+          'text-background-padding': 2,
+          label: 'data(label)'
+        }
+      },
+      {
+        selector: 'edge[label = "child-blocks"]',
+        style: {
+          width: 3,
+          'curve-style': 'unbundled-bezier',
+          'control-point-distance': 40,
+          'target-arrow-shape': 'triangle',
+          'target-arrow-color': '#ff6b35',
+          'line-color': '#ff6b35',
+          'line-style': 'dashed',
+          'edge-text-rotation': 'autorotate',
+          'font-size': 11,
+          'color': '#ff6b35',
           'text-background-color': '#fff',
           'text-background-opacity': 1,
           'text-background-padding': 2,
@@ -322,12 +349,14 @@ async function doSearch() {
     const highlightJql = document.getElementById('highlightJql').value.trim();
     const maxResults = document.getElementById('maxResults').value || '50';
     const layoutName = document.getElementById('layout').value;
+    const childAsBlocking = document.getElementById('childAsBlocking').checked;
 
     // Save current form values to cookies
     saveFormValueToCookie('jql');
     saveFormValueToCookie('highlightJql');
     saveFormValueToCookie('maxResults');
     saveFormValueToCookie('layout');
+    saveFormValueToCookie('childAsBlocking');
 
     const params = { 
       max_results: maxResults
@@ -335,6 +364,7 @@ async function doSearch() {
     
     if (jql) params.jql = jql;
     if (highlightJql) params.highlight_jql = highlightJql;
+    if (childAsBlocking) params.child_as_blocking = 'true';
 
     const graph = await fetchGraph(params);
 
@@ -368,6 +398,7 @@ document.getElementById('layout').addEventListener('change', () => {
 document.getElementById('jql').addEventListener('input', () => saveFormValueToCookie('jql'));
 document.getElementById('highlightJql').addEventListener('input', () => saveFormValueToCookie('highlightJql'));
 document.getElementById('maxResults').addEventListener('input', () => saveFormValueToCookie('maxResults'));
+document.getElementById('childAsBlocking').addEventListener('change', () => saveFormValueToCookie('childAsBlocking'));
 
 // Load saved form values from cookies on page load
 function loadSavedFormValues() {
@@ -375,6 +406,7 @@ function loadSavedFormValues() {
   loadFormValueFromCookie('highlightJql');
   loadFormValueFromCookie('layout');
   loadFormValueFromCookie('maxResults');
+  loadFormValueFromCookie('childAsBlocking');
 }
 
 // Boot

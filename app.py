@@ -82,6 +82,7 @@ def api_search(
     jql: Optional[str] = Query(None, description="Main JQL query"),
     highlight_jql: Optional[str] = Query(None, description="Highlight JQL query (tickets matching this will be highlighted)"),
     max_results: int = Query(50, ge=1, le=500),
+    child_as_blocking: bool = Query(False, description="Show child relationship as blocking link"),
 ) -> JSONResponse:
     # Build JQL - now we only use the main jql parameter
     query_jql = jql if jql else "ORDER BY rank DESC"
@@ -238,6 +239,44 @@ def api_search(
                 if name == "blocks" or inward == "is blocked by":
                     if key in nodes_by_key and other_key in nodes_by_key:
                         edges_set.add((other_key, key, "blocks"))
+
+    # Add child-as-blocking relationships if enabled
+    if child_as_blocking:
+        for issue in all_issues:
+            key = issue.key
+            links = getattr(issue.fields, "issuelinks", []) or []
+            for link in links:
+                lt = getattr(link, "type", None)
+                if not lt:
+                    continue
+
+                # Normalize names for parent/child relationships
+                name = (lt.name or "").lower()
+                outward = (lt.outward or "").lower()
+                inward = (lt.inward or "").lower()
+
+                # Check for child -> parent relationships
+                # Common Jira parent/child link types: "subtask", "is a subtask of", "child of", etc.
+                is_child_relationship = (
+                    "subtask" in name or "child" in name or 
+                    "subtask" in outward or "child" in outward or
+                    "parent" in inward or "is parent of" in inward
+                )
+
+                if is_child_relationship:
+                    # link.outwardIssue exists -> this issue (child) -> outwardIssue (parent)
+                    if hasattr(link, "outwardIssue") and link.outwardIssue:
+                        parent_key = link.outwardIssue.key
+                        if key in nodes_by_key and parent_key in nodes_by_key:
+                            # Child blocks parent
+                            edges_set.add((key, parent_key, "child-blocks"))
+
+                    # link.inwardIssue exists -> inwardIssue (child) -> this issue (parent)
+                    if hasattr(link, "inwardIssue") and link.inwardIssue:
+                        child_key = link.inwardIssue.key
+                        if key in nodes_by_key and child_key in nodes_by_key:
+                            # Child blocks parent
+                            edges_set.add((child_key, key, "child-blocks"))
 
     edges = [{"source": s, "target": t, "label": lbl} for (s, t, lbl) in edges_set]
 
