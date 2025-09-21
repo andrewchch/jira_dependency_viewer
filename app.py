@@ -28,6 +28,7 @@ JIRA_FIELDS = ",".join([
     "status",
     "issuetype",
     "issuelinks",
+    "subtasks",
     START_DATE_FIELD,
     END_DATE_FIELD,
     "duedate",
@@ -97,7 +98,7 @@ def fetch_dependency_tree(client: JIRA, initial_keys: Set[str], original_keys: S
             visited.add(key)
 
             try:
-                issue = client.issue(key, fields="issuelinks")
+                issue = client.issue(key, fields="issuelinks,subtasks")
                 all_linked_keys.add(key)
 
                 # Collect blocking dependencies from this issue
@@ -123,6 +124,14 @@ def fetch_dependency_tree(client: JIRA, initial_keys: Set[str], original_keys: S
                         other_key = link.inwardIssue.key
                         if (name == "blocks" or inward == "is blocked by") and other_key not in visited and other_key not in original_keys:
                             to_process.append(other_key)
+
+                # Collect subtasks from this issue
+                subtasks = getattr(issue.fields, "subtasks", []) or []
+                for subtask in subtasks:
+                    if hasattr(subtask, "key"):
+                        subtask_key = subtask.key
+                        if subtask_key not in visited and subtask_key not in original_keys:
+                            to_process.append(subtask_key)
 
             except Exception as e:
                 # Skip issues we can't access
@@ -242,6 +251,14 @@ def api_search(
                     if (name == "blocks" or inward == "is blocked by") and other_key not in original_keys:
                         initial_linked_keys.add(other_key)
 
+            # Collect subtasks from this issue
+            subtasks = getattr(issue.fields, "subtasks", []) or []
+            for subtask in subtasks:
+                if hasattr(subtask, "key"):
+                    subtask_key = subtask.key
+                    if subtask_key not in original_keys:
+                        initial_linked_keys.add(subtask_key)
+
         # Recursively fetch the full dependency tree
         linked_keys = fetch_dependency_tree(client, initial_linked_keys, original_keys)
         sys.stderr.write(f"Fetched {len(linked_keys)} issues in dependency tree\n")
@@ -271,6 +288,14 @@ def api_search(
                     other_key = link.inwardIssue.key
                     if (name == "blocks" or inward == "is blocked by") and other_key not in original_keys:
                         linked_keys.add(other_key)
+
+            # Collect subtasks from this issue
+            subtasks = getattr(issue.fields, "subtasks", []) or []
+            for subtask in subtasks:
+                if hasattr(subtask, "key"):
+                    subtask_key = subtask.key
+                    if subtask_key not in original_keys:
+                        linked_keys.add(subtask_key)
     
     # Fetch details for linked issues
     linked_issues = []
@@ -338,6 +363,14 @@ def api_search(
                 if name == "blocks" or inward == "is blocked by":
                     if key in nodes_by_key and other_key in nodes_by_key:
                         edges_set.add((other_key, key, "blocks"))
+
+        # Build edges from subtasks (subtask -> parent means subtask blocks parent)
+        subtasks = getattr(issue.fields, "subtasks", []) or []
+        for subtask in subtasks:
+            if hasattr(subtask, "key"):
+                subtask_key = subtask.key
+                if key in nodes_by_key and subtask_key in nodes_by_key:
+                    edges_set.add((subtask_key, key, "subtask"))
 
     # Add child-as-blocking relationships if enabled
     if child_as_blocking:
