@@ -67,6 +67,70 @@ def jira_client() -> JIRA:
         )
     return _jira_client
 
+def fetch_dependency_tree(client: JIRA, initial_keys: Set[str], original_keys: Set[str], max_depth: int = 10) -> Set[str]:
+    """
+    Recursively fetch the full dependency tree for blocking relationships.
+    
+    Args:
+        client: JIRA client instance
+        initial_keys: Starting set of issue keys to traverse
+        original_keys: Set of original query result keys to avoid including
+        max_depth: Maximum depth to traverse to prevent infinite loops
+    
+    Returns:
+        Set of all issue keys in the dependency tree
+    """
+    all_linked_keys = set()
+    visited = set()
+    to_process = list(initial_keys)
+    depth = 0
+    
+    while to_process and depth < max_depth:
+        current_batch = to_process
+        to_process = []
+        depth += 1
+        
+        for key in current_batch:
+            if key in visited or key in original_keys:
+                continue
+                
+            visited.add(key)
+            
+            try:
+                issue = client.issue(key, fields="issuelinks")
+                all_linked_keys.add(key)
+                
+                # Collect blocking dependencies from this issue
+                links = getattr(issue.fields, "issuelinks", []) or []
+                for link in links:
+                    lt = getattr(link, "type", None)
+                    if not lt:
+                        continue
+
+                    # Normalize names
+                    name = (lt.name or "").lower()
+                    outward = (lt.outward or "").lower()
+                    inward = (lt.inward or "").lower()
+
+                    # Check for outward blocking relationships
+                    if hasattr(link, "outwardIssue") and link.outwardIssue:
+                        other_key = link.outwardIssue.key
+                        if (name == "blocks" or outward == "blocks") and other_key not in visited and other_key not in original_keys:
+                            to_process.append(other_key)
+
+                    # Check for inward blocking relationships  
+                    if hasattr(link, "inwardIssue") and link.inwardIssue:
+                        other_key = link.inwardIssue.key
+                        if (name == "blocks" or inward == "is blocked by") and other_key not in visited and other_key not in original_keys:
+                            to_process.append(other_key)
+                            
+            except Exception as e:
+                # Skip issues we can't access
+                sys.stderr.write(f"Could not fetch dependency tree issue {key}: {e}\n")
+                continue
+    
+    return all_linked_keys
+
 # -------------------
 # API response models
 # -------------------
@@ -82,6 +146,7 @@ def api_search(
     jql: Optional[str] = Query(None, description="Main JQL query"),
     highlight_jql: Optional[str] = Query(None, description="Highlight JQL query (tickets matching this will be highlighted)"),
     max_results: int = Query(50, ge=1, le=500),
+    show_dependency_tree: bool = Query(False, description="Show full dependency tree instead of just immediate blockers"),
 ) -> JSONResponse:
     # Build JQL - now we only use the main jql parameter
     query_jql = jql if jql else "ORDER BY rank DESC"
@@ -147,30 +212,64 @@ def api_search(
     
     # Collect linked issue keys that have blocking relationships
     linked_keys = set()
-    for issue in fetched:
-        key = issue.key
-        links = getattr(issue.fields, "issuelinks", []) or []
-        for link in links:
-            lt = getattr(link, "type", None)
-            if not lt:
-                continue
+    
+    if show_dependency_tree:
+        # Use recursive traversal to get full dependency tree
+        initial_linked_keys = set()
+        for issue in fetched:
+            key = issue.key
+            links = getattr(issue.fields, "issuelinks", []) or []
+            for link in links:
+                lt = getattr(link, "type", None)
+                if not lt:
+                    continue
 
-            # Normalize names, Jira typically has name="Blocks", outward="blocks", inward="is blocked by"
-            name = (lt.name or "").lower()
-            outward = (lt.outward or "").lower()
-            inward = (lt.inward or "").lower()
+                # Normalize names
+                name = (lt.name or "").lower()
+                outward = (lt.outward or "").lower()
+                inward = (lt.inward or "").lower()
 
-            # Check for outward blocking relationships
-            if hasattr(link, "outwardIssue") and link.outwardIssue:
-                other_key = link.outwardIssue.key
-                if (name == "blocks" or outward == "blocks") and other_key not in original_keys:
-                    linked_keys.add(other_key)
+                # Check for outward blocking relationships
+                if hasattr(link, "outwardIssue") and link.outwardIssue:
+                    other_key = link.outwardIssue.key
+                    if (name == "blocks" or outward == "blocks") and other_key not in original_keys:
+                        initial_linked_keys.add(other_key)
 
-            # Check for inward blocking relationships  
-            if hasattr(link, "inwardIssue") and link.inwardIssue:
-                other_key = link.inwardIssue.key
-                if (name == "blocks" or inward == "is blocked by") and other_key not in original_keys:
-                    linked_keys.add(other_key)
+                # Check for inward blocking relationships  
+                if hasattr(link, "inwardIssue") and link.inwardIssue:
+                    other_key = link.inwardIssue.key
+                    if (name == "blocks" or inward == "is blocked by") and other_key not in original_keys:
+                        initial_linked_keys.add(other_key)
+        
+        # Recursively fetch the full dependency tree
+        linked_keys = fetch_dependency_tree(client, initial_linked_keys, original_keys)
+        sys.stderr.write(f"Fetched {len(linked_keys)} issues in dependency tree\n")
+    else:
+        # Original logic: only immediate blocking relationships
+        for issue in fetched:
+            key = issue.key
+            links = getattr(issue.fields, "issuelinks", []) or []
+            for link in links:
+                lt = getattr(link, "type", None)
+                if not lt:
+                    continue
+
+                # Normalize names, Jira typically has name="Blocks", outward="blocks", inward="is blocked by"
+                name = (lt.name or "").lower()
+                outward = (lt.outward or "").lower()
+                inward = (lt.inward or "").lower()
+
+                # Check for outward blocking relationships
+                if hasattr(link, "outwardIssue") and link.outwardIssue:
+                    other_key = link.outwardIssue.key
+                    if (name == "blocks" or outward == "blocks") and other_key not in original_keys:
+                        linked_keys.add(other_key)
+
+                # Check for inward blocking relationships  
+                if hasattr(link, "inwardIssue") and link.inwardIssue:
+                    other_key = link.inwardIssue.key
+                    if (name == "blocks" or inward == "is blocked by") and other_key not in original_keys:
+                        linked_keys.add(other_key)
     
     # Fetch details for linked issues
     linked_issues = []
