@@ -10,13 +10,13 @@ html, body { height: 100%; margin: 0; background:#f5f7fa; font-family: system-ui
 }
 .toolbar button.primary { background: var(--blue); color:#fff; border-color: var(--blue); cursor: pointer; }
 .checkbox-label {
-  display: flex; align-items: center; gap: 6px; font-size: 14px; 
+  display: flex; align-items: center; gap: 6px; font-size: 14px;
   white-space: nowrap; cursor: pointer;
 }
 .checkbox-label input[type="checkbox"] {
   margin: 0; width: auto; padding: 0;
 }
-#cy { width: 100%; height: 100%; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; }
+#cy { width: 100%; height: 100%; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-sizing: border-box; }
 .cy-node-html-label { position: absolute; z-index: 9999 !important; pointer-events: none; }
 
 .ticket {
