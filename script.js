@@ -22,11 +22,13 @@ function getCookie(name) {
 function saveFormValueToCookie(elementId) {
   const element = document.getElementById(elementId);
   if (element) {
+    let value;
     if (element.type === 'checkbox') {
-      setCookie(`jira_${elementId}`, element.checked ? 'true' : 'false');
+      value = element.checked ? 'true' : 'false';
     } else {
-      setCookie(`jira_${elementId}`, element.value);
+      value = element.value;
     }
+    setCookie(`jira_${elementId}`, value);
   }
 }
 
@@ -348,6 +350,7 @@ async function doSearch() {
     const jql = document.getElementById('jql').value.trim();
     const highlightJql = document.getElementById('highlightJql').value.trim();
     const maxResults = document.getElementById('maxResults').value || '50';
+    const showDependencyTree = document.getElementById('showDependencyTree').checked;
     const layoutName = document.getElementById('layout').value;
     const childAsBlocking = document.getElementById('childAsBlocking').checked;
 
@@ -357,9 +360,11 @@ async function doSearch() {
     saveFormValueToCookie('maxResults');
     saveFormValueToCookie('layout');
     saveFormValueToCookie('childAsBlocking');
+    saveFormValueToCookie('showDependencyTree');
 
     const params = { 
-      max_results: maxResults
+      max_results: maxResults,
+      show_dependency_tree: showDependencyTree
     };
     
     if (jql) params.jql = jql;
@@ -398,6 +403,7 @@ document.getElementById('layout').addEventListener('change', () => {
 document.getElementById('jql').addEventListener('input', () => saveFormValueToCookie('jql'));
 document.getElementById('highlightJql').addEventListener('input', () => saveFormValueToCookie('highlightJql'));
 document.getElementById('maxResults').addEventListener('input', () => saveFormValueToCookie('maxResults'));
+document.getElementById('showDependencyTree').addEventListener('change', () => saveFormValueToCookie('showDependencyTree'));
 document.getElementById('childAsBlocking').addEventListener('change', () => saveFormValueToCookie('childAsBlocking'));
 
 // Load saved form values from cookies on page load
@@ -406,6 +412,7 @@ function loadSavedFormValues() {
   loadFormValueFromCookie('highlightJql');
   loadFormValueFromCookie('layout');
   loadFormValueFromCookie('maxResults');
+  loadFormValueFromCookie('showDependencyTree');
   loadFormValueFromCookie('childAsBlocking');
 }
 
