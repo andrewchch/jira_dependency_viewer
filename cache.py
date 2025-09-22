@@ -6,8 +6,6 @@ and enable testing without API access.
 """
 
 import json
-import os
-import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from pathlib import Path
@@ -299,6 +297,31 @@ class JiraCache:
         stats["cache_size_mb"] = round(total_size / (1024 * 1024), 2)
         
         return stats
+
+    def list_cached_issue_and_search_keys(self):
+        """ ist all cached issue keys and search hashes."""
+        issue_keys = []
+        search_jql = []
+
+        for cache_file in self.issues_dir.glob("*.json"):
+            try:
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    cache_data = json.load(f)
+                if "data" in cache_data and "key" in cache_data["data"]:
+                    issue_keys.append(cache_data["data"]["key"])
+            except (json.JSONDecodeError, KeyError, OSError):
+                continue
+
+        for cache_file in self.searches_dir.glob("*.json"):
+            try:
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    cache_data = json.load(f)
+                if "data" in cache_data and "jql" in cache_data["data"]:
+                    search_jql.append(cache_data["data"]["jql"])
+            except (json.JSONDecodeError, KeyError, OSError):
+                continue
+
+        return issue_keys, search_jql
 
 
 # Global cache instance

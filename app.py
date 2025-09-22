@@ -230,6 +230,22 @@ def get_cache_stats():
     stats = cache.get_cache_stats()
     return JSONResponse(stats)
 
+@app.get("/api/cache/keys")
+def list_cache_keys():
+    """List all cached issue keys."""
+    cache = get_cache()
+    keys = cache.list_cached_issue_and_search_keys()
+    return JSONResponse({"cached_keys": keys})
+
+@app.get("/api/cache/issue/{issue_key}")
+def get_cached_issue_endpoint(issue_key: str):
+    """Get cached data for a specific issue key."""
+    cache = get_cache()
+    cached_data = cache.get_issue(issue_key)
+    if cached_data is None:
+        return JSONResponse({"error": "Issue not found in cache"}, status_code=404)
+    return JSONResponse(cached_data)
+
 # ----------------
 # API: /api/search
 # ----------------
@@ -402,7 +418,7 @@ def api_search(
     sys.stdout.write(f"Edges: {edges}\n")
 
     # Create the result
-    result = {"nodes": list(nodes_by_key.values()), "edges": edges}
+    result = {"nodes": list(nodes_by_key.values()), "edges": edges, "jql": query_jql}
     
     # Cache the search result
     cache.set_search(search_hash, result)
