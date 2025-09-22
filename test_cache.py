@@ -13,6 +13,33 @@ from pathlib import Path
 from cache import JiraCache
 
 
+def load_fixture_data():
+    """Load test data from fixtures directory."""
+    fixtures_dir = Path(__file__).parent / "fixtures" / "cache"
+    fixtures = {"issues": {}, "searches": {}}
+    
+    # Load issue fixtures
+    issues_dir = fixtures_dir / "issues"
+    if issues_dir.exists():
+        for file_path in issues_dir.glob("*.json"):
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if "data" in data and "key" in data["data"]:
+                    key = data["data"]["key"]
+                    fixtures["issues"][key] = data["data"]
+    
+    # Load search fixtures
+    searches_dir = fixtures_dir / "searches"
+    if searches_dir.exists():
+        for file_path in searches_dir.glob("*.json"):
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if "data" in data:
+                    fixtures["searches"][file_path.stem] = data["data"]
+    
+    return fixtures
+
+
 class TestJiraCache(unittest.TestCase):
     """Test cases for JiraCache class."""
     
@@ -22,26 +49,44 @@ class TestJiraCache(unittest.TestCase):
         self.temp_dir = tempfile.mkdtemp()
         self.cache = JiraCache(cache_dir=self.temp_dir, default_ttl=60)
         
-        # Sample test data
-        self.sample_issue = {
-            "key": "TEST-123",
-            "summary": "Test issue",
-            "status": "In Progress",
-            "fields": {
-                "summary": "Test issue",
-                "status": {"name": "In Progress"}
-            }
-        }
+        # Load fixture data
+        self.fixtures = load_fixture_data()
         
-        self.sample_search = {
-            "nodes": [
-                {"id": "TEST-123", "key": "TEST-123", "summary": "Test issue 1"},
-                {"id": "TEST-124", "key": "TEST-124", "summary": "Test issue 2"}
-            ],
-            "edges": [
-                {"source": "TEST-123", "target": "TEST-124", "label": "blocks"}
-            ]
-        }
+        # Use fixture data if available, otherwise fallback to dummy data
+        if self.fixtures["issues"]:
+            # Use the first available issue from fixtures
+            first_issue_key = list(self.fixtures["issues"].keys())[0]
+            self.sample_issue = self.fixtures["issues"][first_issue_key]
+            # Update the key for consistency with existing tests
+            self.sample_issue["key"] = "TEST-123"
+        else:
+            # Fallback to original dummy data
+            self.sample_issue = {
+                "key": "TEST-123",
+                "summary": "Test issue",
+                "status": "In Progress",
+                "fields": {
+                    "summary": "Test issue",
+                    "status": {"name": "In Progress"}
+                }
+            }
+        
+        # Use fixture data for search if available
+        if self.fixtures["searches"]:
+            # Use the first available search from fixtures
+            first_search_key = list(self.fixtures["searches"].keys())[0]
+            self.sample_search = self.fixtures["searches"][first_search_key]
+        else:
+            # Fallback to original dummy data
+            self.sample_search = {
+                "nodes": [
+                    {"id": "TEST-123", "key": "TEST-123", "summary": "Test issue 1"},
+                    {"id": "TEST-124", "key": "TEST-124", "summary": "Test issue 2"}
+                ],
+                "edges": [
+                    {"source": "TEST-123", "target": "TEST-124", "label": "blocks"}
+                ]
+            }
     
     def tearDown(self):
         """Clean up test fixtures."""
@@ -219,6 +264,30 @@ class TestJiraCache(unittest.TestCase):
             self.cache.set_issue(key, self.sample_issue)
             result = self.cache.get_issue(key)
             self.assertEqual(result, self.sample_issue)
+
+    def test_fixture_data_loading(self):
+        """Test that fixture data is properly loaded and used."""
+        # Verify that fixtures were loaded
+        self.assertIsInstance(self.fixtures, dict)
+        self.assertIn("issues", self.fixtures)
+        self.assertIn("searches", self.fixtures)
+        
+        # If fixtures are available, verify they have the expected structure
+        if self.fixtures["issues"]:
+            for issue_key, issue_data in self.fixtures["issues"].items():
+                self.assertIn("key", issue_data)
+                self.assertIn("fields", issue_data)
+                # Note: The sample_issue key may be modified for test consistency
+                # so we just verify the original fixture data structure
+        
+        if self.fixtures["searches"]:
+            for search_data in self.fixtures["searches"].values():
+                self.assertIn("nodes", search_data)
+                # Each node should have expected fields
+                for node in search_data["nodes"]:
+                    self.assertIn("id", node)
+                    self.assertIn("key", node)
+                    self.assertIn("summary", node)
 
 
 if __name__ == "__main__":
