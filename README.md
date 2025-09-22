@@ -112,6 +112,43 @@ The Gantt chart view provides timeline-based project visualization:
 - **Progress Indicators**: Visual progress based on ticket status (Done=100%, In Progress=50%, others=0%)
 - **Timeline View**: Displays tasks along a calendar timeline with proper scheduling
 
+## Caching
+
+The application includes a local file-based cache to improve performance and enable testing without API access.
+
+### Cache Features
+
+- **Automatic Caching**: Issue details and search results are automatically cached
+- **Performance Improvement**: Avoids redundant API calls for recently fetched data  
+- **TTL Support**: Cache entries expire after 1 hour by default
+- **Testing Support**: Enables functional testing with mock data
+- **Cache Management**: Clear cache via UI button or API endpoint
+
+### Cache Management
+
+- **Clear Cache Button**: Available in the main interface to clear all cached data
+- **API Endpoints**:
+  - `POST /api/cache/clear` - Clear all cache entries
+  - `GET /api/cache/stats` - Get cache statistics
+
+### Using Cache for Testing
+
+1. **Populate Test Data**: Use the `demo_cache.py` script to create sample data:
+   ```bash
+   python demo_cache.py
+   ```
+
+2. **Test Without JIRA API**: The app will use cached data instead of making API calls
+
+3. **Reset Cache**: Use the "Clear Cache" button to return to live API mode
+
+### Cache Storage
+
+- Cache files are stored in the `cache/` directory (excluded from git)
+- Issues and search results are stored separately for optimal organization
+- JSON format for human-readable cache files
+- Automatic cleanup of expired and corrupted cache entries
+
 ## Architecture
 
 ### Backend (FastAPI)
@@ -173,6 +210,33 @@ Search for Jira issues and return dependency graph data.
       "label": "blocks"
     }
   ]
+}
+```
+
+### POST /api/cache/clear
+
+Clear all cached data.
+
+**Response:**
+```json
+{
+  "message": "Cache cleared successfully. Deleted 5 files.",
+  "deleted_count": 5
+}
+```
+
+### GET /api/cache/stats
+
+Get cache statistics.
+
+**Response:**
+```json
+{
+  "total_issues": 10,
+  "total_searches": 3,
+  "expired_issues": 2,
+  "expired_searches": 0,
+  "cache_size_mb": 0.15
 }
 ```
 
