@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from jira import JIRA
 from cache import get_cache
+from jira_objects import create_jira_issue_from_cache
 
 # ---------------------------
 # Config via environment vars
@@ -326,17 +327,9 @@ def api_search(
         for linked_key in linked_keys:
             issue_data = get_cached_issue(linked_key, JIRA_FIELDS)
             if issue_data is not None:
-                # Convert back to object-like structure for compatibility
-                class MockIssue:
-                    def __init__(self, data):
-                        self.key = data["key"]
-                        self.fields = type('obj', (object,), data["fields"])()
-                        # Add special handling for status
-                        if "status" in data["fields"] and isinstance(data["fields"]["status"], dict):
-                            self.fields.status = type('obj', (object,), data["fields"]["status"])()
-                
-                mock_issue = MockIssue(issue_data)
-                linked_issues.append(mock_issue)
+                # Convert cached JSON back to JIRA-compatible object
+                jira_issue = create_jira_issue_from_cache(issue_data)
+                linked_issues.append(jira_issue)
             else:
                 sys.stderr.write(f"Could not fetch linked issue {linked_key}\n")
         
