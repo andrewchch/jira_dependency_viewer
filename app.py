@@ -7,7 +7,7 @@ from fastapi import FastAPI, Query
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from jira import JIRA
+from jira import JIRA, Issue
 from cache import get_cache
 
 # ---------------------------
@@ -69,24 +69,26 @@ def jira_client() -> JIRA:
         )
     return _jira_client
 
-def get_cached_issue(issue_key: str, fields: str = JIRA_FIELDS) -> Optional[Dict[str, Any]]:
+def get_cached_issue(issue_key: str, fields: str = JIRA_FIELDS) -> Issue | None:
     """
     Get issue data with caching.
     
     First checks cache, then falls back to API if not found.
     """
     cache = get_cache()
-    
+    client = jira_client()
+
     # Try to get from cache first
     cached_issue = cache.get_issue(issue_key)
     if cached_issue is not None:
         sys.stderr.write(f"Cache hit for issue {issue_key}\n")
-        return cached_issue
+
+        # Deserialize back to Issue object
+        return Issue(client._options, client._session, raw=cached_issue)
     
     # Cache miss, fetch from API
     sys.stderr.write(f"Cache miss for issue {issue_key}, fetching from API\n")
     try:
-        client = jira_client()
         issue = client.issue(issue_key, fields=fields)
         
         # Use the raw JSON data from JIRA API instead of manual serialization
@@ -95,7 +97,7 @@ def get_cached_issue(issue_key: str, fields: str = JIRA_FIELDS) -> Optional[Dict
         
         # Cache the result
         cache.set_issue(issue_key, issue_data)
-        return issue_data
+        return issue
         
     except Exception as e:
         sys.stderr.write(f"Failed to fetch issue {issue_key}: {e}\n")
