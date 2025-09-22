@@ -391,8 +391,31 @@ async function doSearch() {
   }
 }
 
+// Clear cache function
+async function clearCache() {
+  try {
+    const response = await fetch('/api/cache/clear', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      alert(`${result.message}`);
+    } else {
+      alert('Failed to clear cache. Please try again.');
+    }
+  } catch (error) {
+    console.error('Error clearing cache:', error);
+    alert('Error clearing cache. Please check the console for details.');
+  }
+}
+
 // UI wiring
 document.getElementById('searchBtn').addEventListener('click', doSearch);
+document.getElementById('clearCacheBtn').addEventListener('click', clearCache);
 document.getElementById('layout').addEventListener('change', () => {
   const layoutName = document.getElementById('layout').value;
   saveFormValueToCookie('layout');

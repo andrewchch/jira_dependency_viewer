@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from jira import JIRA
+from cache import get_cache
 
 # ---------------------------
 # Config via environment vars
@@ -68,13 +69,108 @@ def jira_client() -> JIRA:
         )
     return _jira_client
 
-def fetch_dependency_tree(client: JIRA, initial_keys: Set[str], original_keys: Set[str], max_depth: int = 10,
+def get_cached_issue(issue_key: str, fields: str = JIRA_FIELDS) -> Optional[Dict[str, Any]]:
+    """
+    Get issue data with caching.
+    
+    First checks cache, then falls back to API if not found.
+    """
+    cache = get_cache()
+    
+    # Try to get from cache first
+    cached_issue = cache.get_issue(issue_key)
+    if cached_issue is not None:
+        sys.stderr.write(f"Cache hit for issue {issue_key}\n")
+        return cached_issue
+    
+    # Cache miss, fetch from API
+    sys.stderr.write(f"Cache miss for issue {issue_key}, fetching from API\n")
+    try:
+        client = jira_client()
+        issue = client.issue(issue_key, fields=fields)
+        
+        # Convert JIRA issue to serializable dict
+        issue_data = {
+            "key": issue.key,
+            "fields": {}
+        }
+        
+        # Extract field data that we need
+        for field_name in fields.split(","):
+            field_name = field_name.strip()
+            if hasattr(issue.fields, field_name):
+                field_value = getattr(issue.fields, field_name)
+                if field_value is not None:
+                    # Handle special object types
+                    if hasattr(field_value, '__dict__'):
+                        if hasattr(field_value, 'name'):  # Status, IssuType, etc.
+                            issue_data["fields"][field_name] = {"name": field_value.name}
+                        elif hasattr(field_value, 'key'):  # Linked issues
+                            issue_data["fields"][field_name] = {"key": field_value.key}
+                        else:
+                            # Try to serialize as dict
+                            try:
+                                issue_data["fields"][field_name] = field_value.__dict__
+                            except:
+                                issue_data["fields"][field_name] = str(field_value)
+                    elif isinstance(field_value, list):
+                        # Handle lists (like issuelinks, subtasks)
+                        serialized_list = []
+                        for item in field_value:
+                            if hasattr(item, '__dict__'):
+                                try:
+                                    serialized_list.append(item.__dict__)
+                                except:
+                                    serialized_list.append(str(item))
+                            else:
+                                serialized_list.append(item)
+                        issue_data["fields"][field_name] = serialized_list
+                    else:
+                        issue_data["fields"][field_name] = field_value
+        
+        # Cache the result
+        cache.set_issue(issue_key, issue_data)
+        return issue_data
+        
+    except Exception as e:
+        sys.stderr.write(f"Failed to fetch issue {issue_key}: {e}\n")
+        return None
+
+def search_issues_with_cache(jql: str, max_results: int = 50, fields: str = JIRA_FIELDS) -> List[Any]:
+    """
+    Search for issues with caching support.
+    
+    This is a simple wrapper that doesn't cache search results individually,
+    but could be extended to do so.
+    """
+    try:
+        client = jira_client()
+        next_page_token = None
+        fetched = []
+        
+        while True:
+            batch = client.enhanced_search_issues(
+                jql_str=jql,
+                maxResults=min(50, max_results - len(fetched)),
+                fields=fields,
+                nextPageToken=next_page_token
+            )
+            next_page_token = getattr(batch, "nextPageToken", None)
+            fetched.extend(batch)
+            if len(fetched) >= max_results or not next_page_token:
+                break
+        
+        return fetched
+    except Exception as e:
+        sys.stderr.write(f"Failed to search issues: {e}\n")
+        return []
+
+def fetch_dependency_tree(initial_keys: Set[str], original_keys: Set[str], max_depth: int = 10,
                           traverse_children: bool = False) -> Set[str]:
     """
-    Recursively fetch the full dependency tree for blocking relationships.
+    Recursively fetch the full dependency tree for blocking relationships using cache.
 
     Args:
-        client: JIRA client instance
         initial_keys: Starting set of issue keys to traverse
         original_keys: Set of original query result keys to avoid including
         max_depth: Maximum depth to traverse to prevent infinite loops
@@ -98,47 +194,44 @@ def fetch_dependency_tree(client: JIRA, initial_keys: Set[str], original_keys: S
 
             visited.add(key)
 
-            try:
-                issue = client.issue(key, fields="issuelinks,subtasks")
-                all_linked_keys.add(key)
-
-                # Collect blocking dependencies from this issue
-                links = getattr(issue.fields, "issuelinks", []) or []
-                for link in links:
-                    lt = getattr(link, "type", None)
-                    if not lt:
-                        continue
-
-                    # Normalize names
-                    name = (lt.name or "").lower()
-                    outward = (lt.outward or "").lower()
-                    inward = (lt.inward or "").lower()
-
-                    # Check for outward blocking relationships
-                    if hasattr(link, "outwardIssue") and link.outwardIssue:
-                        other_key = link.outwardIssue.key
-                        if (name == "blocks" or outward == "blocks") and other_key not in visited and other_key not in original_keys:
-                            to_process.append(other_key)
-
-                    # Check for inward blocking relationships
-                    if hasattr(link, "inwardIssue") and link.inwardIssue:
-                        other_key = link.inwardIssue.key
-                        if (name == "blocks" or inward == "is blocked by") and other_key not in visited and other_key not in original_keys:
-                            to_process.append(other_key)
-
-                # Collect subtasks from this issue
-                if traverse_children:
-                    subtasks = getattr(issue.fields, "subtasks", []) or []
-                    for subtask in subtasks:
-                        if hasattr(subtask, "key"):
-                            subtask_key = subtask.key
-                            if subtask_key not in visited and subtask_key not in original_keys:
-                                to_process.append(subtask_key)
-
-            except Exception as e:
-                # Skip issues we can't access
-                sys.stderr.write(f"Could not fetch dependency tree issue {key}: {e}\n")
+            # Use cached issue lookup
+            issue_data = get_cached_issue(key, "issuelinks,subtasks")
+            if issue_data is None:
                 continue
+                
+            all_linked_keys.add(key)
+
+            # Collect blocking dependencies from this issue
+            links = issue_data.get("fields", {}).get("issuelinks", []) or []
+            for link in links:
+                link_type = link.get("type", {})
+                if not link_type:
+                    continue
+
+                # Normalize names
+                name = (link_type.get("name", "") or "").lower()
+                outward = (link_type.get("outward", "") or "").lower()
+                inward = (link_type.get("inward", "") or "").lower()
+
+                # Check for outward blocking relationships
+                if "outwardIssue" in link and link["outwardIssue"]:
+                    other_key = link["outwardIssue"].get("key")
+                    if other_key and (name == "blocks" or outward == "blocks") and other_key not in visited and other_key not in original_keys:
+                        to_process.append(other_key)
+
+                # Check for inward blocking relationships
+                if "inwardIssue" in link and link["inwardIssue"]:
+                    other_key = link["inwardIssue"].get("key")
+                    if other_key and (name == "blocks" or inward == "is blocked by") and other_key not in visited and other_key not in original_keys:
+                        to_process.append(other_key)
+
+            # Collect subtasks from this issue
+            if traverse_children:
+                subtasks = issue_data.get("fields", {}).get("subtasks", []) or []
+                for subtask in subtasks:
+                    subtask_key = subtask.get("key")
+                    if subtask_key and subtask_key not in visited and subtask_key not in original_keys:
+                        to_process.append(subtask_key)
 
     return all_linked_keys
 
@@ -148,6 +241,26 @@ def fetch_dependency_tree(client: JIRA, initial_keys: Set[str], original_keys: S
 class Graph(BaseModel):
     nodes: List[Dict[str, Any]]
     edges: List[Dict[str, Any]]
+
+# ----------------------
+# API: Cache Management
+# ----------------------
+@app.post("/api/cache/clear")
+def clear_cache():
+    """Clear all cached data."""
+    cache = get_cache()
+    deleted_count = cache.clear_all()
+    return JSONResponse({
+        "message": f"Cache cleared successfully. Deleted {deleted_count} files.",
+        "deleted_count": deleted_count
+    })
+
+@app.get("/api/cache/stats")
+def get_cache_stats():
+    """Get cache statistics."""
+    cache = get_cache()
+    stats = cache.get_cache_stats()
+    return JSONResponse(stats)
 
 # ----------------
 # API: /api/search
@@ -160,38 +273,39 @@ def api_search(
     child_as_blocking: bool = Query(False, description="Show child relationship as blocking link"),
     show_dependency_tree: bool = Query(False, description="Show full dependency tree instead of just immediate blockers"),
 ) -> JSONResponse:
+    cache = get_cache()
+    
+    # Create cache key for this search
+    search_hash = cache.create_search_hash(
+        jql=jql or "",
+        highlight_jql=highlight_jql,
+        max_results=max_results,
+        child_as_blocking=child_as_blocking,
+        show_dependency_tree=show_dependency_tree
+    )
+    
+    # Try to get cached search results
+    cached_result = cache.get_search(search_hash)
+    if cached_result is not None:
+        sys.stderr.write(f"Cache hit for search query\n")
+        return JSONResponse(cached_result)
+    
+    sys.stderr.write(f"Cache miss for search query, executing...\n")
+    
     # Build JQL - now we only use the main jql parameter
     query_jql = jql if jql else "ORDER BY rank DESC"
 
     sys.stderr.write(f"Main JQL: {query_jql}\n")
 
-    # Query Jira (paginate if needed)
-    client = jira_client()
-    next_page_token = None
-    fetched = []
-
-    while True:
-        batch = client.enhanced_search_issues(
-            jql_str=query_jql,
-            maxResults=min(50, max_results - len(fetched)),
-            fields=JIRA_FIELDS,
-            nextPageToken=next_page_token
-        )
-        next_page_token = getattr(batch, "nextPageToken", None)
-        fetched.extend(batch)
-        if len(fetched) >= max_results or not next_page_token:
-            break
+    # Query Jira using the cached search function
+    fetched = search_issues_with_cache(query_jql, max_results, JIRA_FIELDS)
 
     # Execute highlight JQL query if provided to get highlighted ticket keys
     highlighted_keys = set()
     if highlight_jql:
         try:
             sys.stderr.write(f"Highlight JQL: {highlight_jql}\n")
-            highlight_results = client.enhanced_search_issues(
-                jql_str=highlight_jql,
-                maxResults=1000,  # Get a reasonable number of highlight results
-                fields="key",  # We only need the keys for highlighting
-            )
+            highlight_results = search_issues_with_cache(highlight_jql, 1000, "key")
             highlighted_keys = {issue.key for issue in highlight_results}
             sys.stderr.write(f"Found {len(highlighted_keys)} tickets to highlight\n")
         except Exception as e:
@@ -237,21 +351,29 @@ def api_search(
                     initial_linked_keys.add(other_key)
 
         # Recursively fetch the full dependency tree
-        linked_keys = fetch_dependency_tree(client, initial_linked_keys, original_keys,
+        linked_keys = fetch_dependency_tree(initial_linked_keys, original_keys,
                                             traverse_children=child_as_blocking, max_depth=max_depth)
         sys.stderr.write(f"Fetched {len(linked_keys)} issues in dependency tree\n")
 
-    # Fetch details for linked issues
+    # Fetch details for linked issues using cache
     linked_issues = []
     if linked_keys:
         for linked_key in linked_keys:
-            try:
-                linked_issue = client.issue(linked_key, fields=JIRA_FIELDS)
-                linked_issues.append(linked_issue)
-            except Exception as e:
-                # Skip issues we can't access
-                sys.stderr.write(f"Could not fetch linked issue {linked_key}: {e}\n")
-                continue
+            issue_data = get_cached_issue(linked_key, JIRA_FIELDS)
+            if issue_data is not None:
+                # Convert back to object-like structure for compatibility
+                class MockIssue:
+                    def __init__(self, data):
+                        self.key = data["key"]
+                        self.fields = type('obj', (object,), data["fields"])()
+                        # Add special handling for status
+                        if "status" in data["fields"] and isinstance(data["fields"]["status"], dict):
+                            self.fields.status = type('obj', (object,), data["fields"]["status"])()
+                
+                mock_issue = MockIssue(issue_data)
+                linked_issues.append(mock_issue)
+            else:
+                sys.stderr.write(f"Could not fetch linked issue {linked_key}\n")
         
         # Add linked issues as nodes
         for issue in linked_issues:
@@ -321,7 +443,13 @@ def api_search(
 
     sys.stdout.write(f"Edges: {edges}\n")
 
-    return JSONResponse({"nodes": list(nodes_by_key.values()), "edges": edges})
+    # Create the result
+    result = {"nodes": list(nodes_by_key.values()), "edges": edges}
+    
+    # Cache the search result
+    cache.set_search(search_hash, result)
+    
+    return JSONResponse(result)
 
 # -------------
 # Single-page UI

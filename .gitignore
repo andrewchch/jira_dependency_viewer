@@ -40,3 +40,4 @@ Thumbs.db
 
 # Application specific
 *.log
+cache/
