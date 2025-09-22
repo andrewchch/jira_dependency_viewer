@@ -162,7 +162,7 @@ def fetch_dependency_tree(initial_keys: Set[str], original_keys: Set[str], max_d
             visited.add(key)
 
             # Use cached issue lookup
-            issue = get_cached_issue(key, "issuelinks,subtasks")
+            issue = get_cached_issue(key)
             if issue is None:
                 continue
                 
