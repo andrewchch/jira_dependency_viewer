@@ -162,43 +162,44 @@ def fetch_dependency_tree(initial_keys: Set[str], original_keys: Set[str], max_d
             visited.add(key)
 
             # Use cached issue lookup
-            issue_data = get_cached_issue(key, "issuelinks,subtasks")
-            if issue_data is None:
+            issue = get_cached_issue(key, "issuelinks,subtasks")
+            if issue is None:
                 continue
                 
             all_linked_keys.add(key)
 
             # Collect blocking dependencies from this issue
-            links = issue_data.get("fields", {}).get("issuelinks", []) or []
+            links = getattr(issue.fields, "issuelinks", []) or []
             for link in links:
-                link_type = link.get("type", {})
-                if not link_type:
+                lt = getattr(link, "type", None)
+                if not lt:
                     continue
 
                 # Normalize names
-                name = (link_type.get("name", "") or "").lower()
-                outward = (link_type.get("outward", "") or "").lower()
-                inward = (link_type.get("inward", "") or "").lower()
+                name = (lt.name or "").lower()
+                outward = (lt.outward or "").lower()
+                inward = (lt.inward or "").lower()
 
                 # Check for outward blocking relationships
-                if "outwardIssue" in link and link["outwardIssue"]:
-                    other_key = link["outwardIssue"].get("key")
+                if hasattr(link, "outwardIssue") and link.outwardIssue:
+                    other_key = link.outwardIssue.key
                     if other_key and (name == "blocks" or outward == "blocks") and other_key not in visited and other_key not in original_keys:
                         to_process.append(other_key)
 
                 # Check for inward blocking relationships
-                if "inwardIssue" in link and link["inwardIssue"]:
-                    other_key = link["inwardIssue"].get("key")
+                if hasattr(link, "inwardIssue") and link.inwardIssue:
+                    other_key = link.inwardIssue.key
                     if other_key and (name == "blocks" or inward == "is blocked by") and other_key not in visited and other_key not in original_keys:
                         to_process.append(other_key)
 
             # Collect subtasks from this issue
             if traverse_children:
-                subtasks = issue_data.get("fields", {}).get("subtasks", []) or []
+                subtasks = getattr(issue.fields, "subtasks", []) or []
                 for subtask in subtasks:
-                    subtask_key = subtask.get("key")
-                    if subtask_key and subtask_key not in visited and subtask_key not in original_keys:
-                        to_process.append(subtask_key)
+                    if hasattr(subtask, "key"):
+                        subtask_key = subtask.key
+                        if subtask_key and subtask_key not in visited and subtask_key not in original_keys:
+                            to_process.append(subtask_key)
 
     return all_linked_keys
 
@@ -326,19 +327,9 @@ def api_search(
     linked_issues = []
     if linked_keys:
         for linked_key in linked_keys:
-            issue_data = get_cached_issue(linked_key, JIRA_FIELDS)
-            if issue_data is not None:
-                # Convert back to object-like structure for compatibility
-                class MockIssue:
-                    def __init__(self, data):
-                        self.key = data["key"]
-                        self.fields = type('obj', (object,), data["fields"])()
-                        # Add special handling for status
-                        if "status" in data["fields"] and isinstance(data["fields"]["status"], dict):
-                            self.fields.status = type('obj', (object,), data["fields"]["status"])()
-                
-                mock_issue = MockIssue(issue_data)
-                linked_issues.append(mock_issue)
+            issue = get_cached_issue(linked_key, JIRA_FIELDS)
+            if issue is not None:
+                linked_issues.append(issue)
             else:
                 sys.stderr.write(f"Could not fetch linked issue {linked_key}\n")
         
