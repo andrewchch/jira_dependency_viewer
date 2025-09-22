@@ -2,13 +2,13 @@
 import os
 import sys
 
-from typing import List, Optional, Dict, Any, Set, Tuple
+from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, Query
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from jira import JIRA, Issue
 from cache import get_cache
+from jira_helper import JiraHelper
+from graph_builder import GraphBuilder
 
 # ---------------------------
 # Config via environment vars
@@ -41,6 +41,10 @@ JIRA_FIELDS = ",".join([
 # -------------
 app = FastAPI(title="Jira Dependency Graph")
 
+# Initialize helper classes
+jira_helper = JiraHelper(JIRA_SERVER, JIRA_EMAIL, JIRA_API_TOKEN, JIRA_FIELDS)
+graph_builder = GraphBuilder(jira_helper, JIRA_SERVER, START_DATE_FIELD, END_DATE_FIELD, STORY_POINTS_FIELD)
+
 # Serve static files
 @app.get("/styles.css")
 def get_styles():
@@ -56,152 +60,6 @@ def get_script():
 def get_demo():
     demo_path = os.path.join(os.path.dirname(__file__), "demo.html")
     return FileResponse(demo_path, media_type="text/html")
-
-# Lazy Jira client
-_jira_client: Optional[JIRA] = None
-def jira_client() -> JIRA:
-    global _jira_client
-    if _jira_client is None:
-        _jira_client = JIRA(
-            options={"server": JIRA_SERVER},
-            basic_auth=(JIRA_EMAIL, JIRA_API_TOKEN),
-            validate=True,
-        )
-    return _jira_client
-
-def get_cached_issue(issue_key: str, fields: str = JIRA_FIELDS) -> Issue | None:
-    """
-    Get issue data with caching.
-    
-    First checks cache, then falls back to API if not found.
-    """
-    cache = get_cache()
-    client = jira_client()
-
-    # Try to get from cache first
-    cached_issue = cache.get_issue(issue_key)
-    if cached_issue is not None:
-        sys.stderr.write(f"Cache hit for issue {issue_key}\n")
-
-        # Deserialize back to Issue object
-        return Issue(client._options, client._session, raw=cached_issue)
-    
-    # Cache miss, fetch from API
-    sys.stderr.write(f"Cache miss for issue {issue_key}, fetching from API\n")
-    try:
-        issue = client.issue(issue_key, fields=fields)
-        
-        # Use the raw JSON data from JIRA API instead of manual serialization
-        # This avoids serialization issues with non-scalar keys and complex objects
-        issue_data = issue.raw
-        
-        # Cache the result
-        cache.set_issue(issue_key, issue_data)
-        return issue
-        
-    except Exception as e:
-        sys.stderr.write(f"Failed to fetch issue {issue_key}: {e}\n")
-        return None
-
-def search_issues_with_cache(jql: str, max_results: int = 50, fields: str = JIRA_FIELDS) -> List[Any]:
-    """
-    Search for issues with caching support.
-    
-    This is a simple wrapper that doesn't cache search results individually,
-    but could be extended to do so.
-    """
-    try:
-        client = jira_client()
-        next_page_token = None
-        fetched = []
-        
-        while True:
-            batch = client.enhanced_search_issues(
-                jql_str=jql,
-                maxResults=min(50, max_results - len(fetched)),
-                fields=fields,
-                nextPageToken=next_page_token
-            )
-            next_page_token = getattr(batch, "nextPageToken", None)
-            fetched.extend(batch)
-            if len(fetched) >= max_results or not next_page_token:
-                break
-        
-        return fetched
-    except Exception as e:
-        sys.stderr.write(f"Failed to search issues: {e}\n")
-        return []
-
-def fetch_dependency_tree(initial_keys: Set[str], original_keys: Set[str], max_depth: int = 10,
-                          traverse_children: bool = False) -> Set[str]:
-    """
-    Recursively fetch the full dependency tree for blocking relationships using cache.
-
-    Args:
-        initial_keys: Starting set of issue keys to traverse
-        original_keys: Set of original query result keys to avoid including
-        max_depth: Maximum depth to traverse to prevent infinite loops
-
-    Returns:
-        Set of all issue keys in the dependency tree
-    """
-    all_linked_keys = set()
-    visited = set()
-    to_process = list(initial_keys)
-    depth = 0
-
-    while to_process and depth < max_depth:
-        current_batch = to_process
-        to_process = []
-        depth += 1
-
-        for key in current_batch:
-            if key in visited or key in original_keys:
-                continue
-
-            visited.add(key)
-
-            # Use cached issue lookup
-            issue = get_cached_issue(key)
-            if issue is None:
-                continue
-                
-            all_linked_keys.add(key)
-
-            # Collect blocking dependencies from this issue
-            links = getattr(issue.fields, "issuelinks", []) or []
-            for link in links:
-                lt = getattr(link, "type", None)
-                if not lt:
-                    continue
-
-                # Normalize names
-                name = (lt.name or "").lower()
-                outward = (lt.outward or "").lower()
-                inward = (lt.inward or "").lower()
-
-                # Check for outward blocking relationships
-                if hasattr(link, "outwardIssue") and link.outwardIssue:
-                    other_key = link.outwardIssue.key
-                    if other_key and (name == "blocks" or outward == "blocks") and other_key not in visited and other_key not in original_keys:
-                        to_process.append(other_key)
-
-                # Check for inward blocking relationships
-                if hasattr(link, "inwardIssue") and link.inwardIssue:
-                    other_key = link.inwardIssue.key
-                    if other_key and (name == "blocks" or inward == "is blocked by") and other_key not in visited and other_key not in original_keys:
-                        to_process.append(other_key)
-
-            # Collect subtasks from this issue
-            if traverse_children:
-                subtasks = getattr(issue.fields, "subtasks", []) or []
-                for subtask in subtasks:
-                    if hasattr(subtask, "key"):
-                        subtask_key = subtask.key
-                        if subtask_key and subtask_key not in visited and subtask_key not in original_keys:
-                            to_process.append(subtask_key)
-
-    return all_linked_keys
 
 # -------------------
 # API response models
@@ -281,144 +139,26 @@ def api_search(
 
     sys.stderr.write(f"Main JQL: {query_jql}\n")
 
-    # Query Jira using the cached search function
-    fetched = search_issues_with_cache(query_jql, max_results, JIRA_FIELDS)
+    # Query Jira using the helper
+    fetched = jira_helper.search_issues_with_cache(query_jql, max_results, JIRA_FIELDS)
 
     # Execute highlight JQL query if provided to get highlighted ticket keys
     highlighted_keys = set()
     if highlight_jql:
         try:
             sys.stderr.write(f"Highlight JQL: {highlight_jql}\n")
-            highlight_results = search_issues_with_cache(highlight_jql, 1000, "key")
+            highlight_results = jira_helper.search_issues_with_cache(highlight_jql, 1000, "key")
             highlighted_keys = {issue.key for issue in highlight_results}
             sys.stderr.write(f"Found {len(highlighted_keys)} tickets to highlight\n")
         except Exception as e:
             sys.stderr.write(f"Error executing highlight JQL: {e}\n")
             # Continue without highlighting if the query fails
 
-    # Build nodes from original query results
-    nodes_by_key: Dict[str, Dict[str, Any]] = {}
-    original_keys = set()
-    linked_keys = set()
-
-    # We will use the recursive approach to traverse the tree but limit depth to 1 if we just want immediate blockers
-    if show_dependency_tree:
-        max_depth = 10  # Limit depth to prevent infinite loops
-    else:
-        max_depth = 1
-
-    # Use recursive traversal to get full dependency tree (this adds child issues too)
-    initial_linked_keys = set()
-    for issue in fetched:
-        key = issue.key
-        links = getattr(issue.fields, "issuelinks", []) or []
-        for link in links:
-            lt = getattr(link, "type", None)
-            if not lt:
-                continue
-
-            # Normalize names
-            name = (lt.name or "").lower()
-            outward = (lt.outward or "").lower()
-            inward = (lt.inward or "").lower()
-
-            # Check for outward blocking relationships
-            if hasattr(link, "outwardIssue") and link.outwardIssue:
-                other_key = link.outwardIssue.key
-                if (name == "blocks" or outward == "blocks") and other_key not in original_keys:
-                    initial_linked_keys.add(other_key)
-
-            # Check for inward blocking relationships
-            if hasattr(link, "inwardIssue") and link.inwardIssue:
-                other_key = link.inwardIssue.key
-                if (name == "blocks" or inward == "is blocked by") and other_key not in original_keys:
-                    initial_linked_keys.add(other_key)
-
-        # Recursively fetch the full dependency tree
-        linked_keys = fetch_dependency_tree(initial_linked_keys, original_keys,
-                                            traverse_children=child_as_blocking, max_depth=max_depth)
-        sys.stderr.write(f"Fetched {len(linked_keys)} issues in dependency tree\n")
-
-    # Fetch details for linked issues using cache
-    linked_issues = []
-    if linked_keys:
-        for linked_key in linked_keys:
-            issue = get_cached_issue(linked_key, JIRA_FIELDS)
-            if issue is not None:
-                linked_issues.append(issue)
-            else:
-                sys.stderr.write(f"Could not fetch linked issue {linked_key}\n")
-        
-        # Add linked issues as nodes
-        for issue in linked_issues:
-            fields = issue.fields
-            key = issue.key
-            start = getattr(fields, START_DATE_FIELD, None)
-            end = getattr(fields, END_DATE_FIELD, None)
-            story_points = getattr(fields, STORY_POINTS_FIELD, None)
-            status = fields.status.name if getattr(fields, "status", None) else None
-
-            nodes_by_key[key] = {
-                "id": key,
-                "key": key,
-                "summary": fields.summary,
-                "status": status or "-",
-                "start": start or "-",
-                "end": end or "-",
-                "story_points": story_points,
-                "url": f"{JIRA_SERVER.rstrip('/')}/browse/{key}",
-                "isOriginal": False,  # Mark as linked issue
-                "isHighlighted": key in highlighted_keys,  # Mark if ticket should be highlighted
-            }
-
-    # Build edges from "blocks" links (current → other means current blocks other)
-    # Now we need to check all issues (original + linked) for their relationships
-    edges_set: Set[Tuple[str, str, str]] = set()
-    all_issues = fetched + linked_issues
+    # Build graph data using the graph builder
+    graph_data = graph_builder.build_graph_data(fetched, highlighted_keys, show_dependency_tree, child_as_blocking)
     
-    for issue in all_issues:
-        key = issue.key
-        links = getattr(issue.fields, "issuelinks", []) or []
-        for link in links:
-            lt = getattr(link, "type", None)
-            if not lt:
-                continue
-
-            # Normalize names, Jira typically has name="Blocks", outward="blocks", inward="is blocked by"
-            name = (lt.name or "").lower()
-            outward = (lt.outward or "").lower()
-            inward = (lt.inward or "").lower()
-
-            # link.outwardIssue exists -> this issue -> outwardIssue (e.g., "blocks")
-            if hasattr(link, "outwardIssue") and link.outwardIssue:
-                other_key = link.outwardIssue.key
-                if name == "blocks" or outward == "blocks":
-                    if key in nodes_by_key and other_key in nodes_by_key:
-                        edges_set.add((key, other_key, "blocks"))
-
-            # link.inwardIssue exists -> inwardIssue -> this issue (e.g., "is blocked by")
-            if hasattr(link, "inwardIssue") and link.inwardIssue:
-                other_key = link.inwardIssue.key
-                # Create an edge from blocker to current issue
-                if name == "blocks" or inward == "is blocked by":
-                    if key in nodes_by_key and other_key in nodes_by_key:
-                        edges_set.add((other_key, key, "blocks"))
-
-        # Build edges from subtasks (subtask -> parent means subtask blocks parent)
-        if child_as_blocking:
-            subtasks = getattr(issue.fields, "subtasks", []) or []
-            for subtask in subtasks:
-                if hasattr(subtask, "key"):
-                    subtask_key = subtask.key
-                    if key in nodes_by_key and subtask_key in nodes_by_key:
-                        edges_set.add((subtask_key, key, "subtask"))
-
-    edges = [{"source": s, "target": t, "label": lbl} for (s, t, lbl) in edges_set]
-
-    sys.stdout.write(f"Edges: {edges}\n")
-
     # Create the result
-    result = {"nodes": list(nodes_by_key.values()), "edges": edges, "jql": query_jql}
+    result = {"nodes": graph_data["nodes"], "edges": graph_data["edges"], "jql": query_jql}
     
     # Cache the search result
     cache.set_search(search_hash, result)
