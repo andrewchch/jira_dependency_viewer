@@ -68,7 +68,8 @@ def jira_client() -> JIRA:
         )
     return _jira_client
 
-def fetch_dependency_tree(client: JIRA, initial_keys: Set[str], original_keys: Set[str], max_depth: int = 10) -> Set[str]:
+def fetch_dependency_tree(client: JIRA, initial_keys: Set[str], original_keys: Set[str], max_depth: int = 10,
+                          traverse_children: bool = False) -> Set[str]:
     """
     Recursively fetch the full dependency tree for blocking relationships.
 
@@ -126,12 +127,13 @@ def fetch_dependency_tree(client: JIRA, initial_keys: Set[str], original_keys: S
                             to_process.append(other_key)
 
                 # Collect subtasks from this issue
-                subtasks = getattr(issue.fields, "subtasks", []) or []
-                for subtask in subtasks:
-                    if hasattr(subtask, "key"):
-                        subtask_key = subtask.key
-                        if subtask_key not in visited and subtask_key not in original_keys:
-                            to_process.append(subtask_key)
+                if traverse_children:
+                    subtasks = getattr(issue.fields, "subtasks", []) or []
+                    for subtask in subtasks:
+                        if hasattr(subtask, "key"):
+                            subtask_key = subtask.key
+                            if subtask_key not in visited and subtask_key not in original_keys:
+                                to_process.append(subtask_key)
 
             except Exception as e:
                 # Skip issues we can't access
@@ -165,18 +167,20 @@ def api_search(
 
     # Query Jira (paginate if needed)
     client = jira_client()
-    start_at = 0
+    next_page_token = None
     fetched = []
+
     while True:
         batch = client.enhanced_search_issues(
             jql_str=query_jql,
             maxResults=min(50, max_results - len(fetched)),
             fields=JIRA_FIELDS,
+            nextPageToken=next_page_token
         )
+        next_page_token = getattr(batch, "nextPageToken", None)
         fetched.extend(batch)
-        if len(fetched) >= max_results or len(batch) == 0:
+        if len(fetched) >= max_results or not next_page_token:
             break
-        start_at += len(batch)
 
     # Execute highlight JQL query if provided to get highlighted ticket keys
     highlighted_keys = set()
@@ -197,106 +201,46 @@ def api_search(
     # Build nodes from original query results
     nodes_by_key: Dict[str, Dict[str, Any]] = {}
     original_keys = set()
-    
-    for issue in fetched:
-        fields = issue.fields
-        key = issue.key
-        start = getattr(fields, START_DATE_FIELD, None)
-        end = getattr(fields, END_DATE_FIELD, None)
-        story_points = getattr(fields, STORY_POINTS_FIELD, None)
-        status = fields.status.name if getattr(fields, "status", None) else None
-
-        nodes_by_key[key] = {
-            "id": key,  # use key as id so edges can refer to it
-            "key": key,
-            "summary": fields.summary,
-            "status": status or "-",
-            "start": start or "-",
-            "end": end or "-",
-            "story_points": story_points,
-            "url": f"{JIRA_SERVER.rstrip('/')}/browse/{key}",
-            "isOriginal": True,  # Mark as original query result
-            "isHighlighted": key in highlighted_keys,  # Mark if ticket should be highlighted
-        }
-        original_keys.add(key)
-    
-    # Collect linked issue keys that have blocking relationships
     linked_keys = set()
 
+    # We will use the recursive approach to traverse the tree but limit depth to 1 if we just want immediate blockers
     if show_dependency_tree:
-        # Use recursive traversal to get full dependency tree
-        initial_linked_keys = set()
-        for issue in fetched:
-            key = issue.key
-            links = getattr(issue.fields, "issuelinks", []) or []
-            for link in links:
-                lt = getattr(link, "type", None)
-                if not lt:
-                    continue
+        max_depth = 10  # Limit depth to prevent infinite loops
+    else:
+        max_depth = 1
 
-                # Normalize names
-                name = (lt.name or "").lower()
-                outward = (lt.outward or "").lower()
-                inward = (lt.inward or "").lower()
+    # Use recursive traversal to get full dependency tree (this adds child issues too)
+    initial_linked_keys = set()
+    for issue in fetched:
+        key = issue.key
+        links = getattr(issue.fields, "issuelinks", []) or []
+        for link in links:
+            lt = getattr(link, "type", None)
+            if not lt:
+                continue
 
-                # Check for outward blocking relationships
-                if hasattr(link, "outwardIssue") and link.outwardIssue:
-                    other_key = link.outwardIssue.key
-                    if (name == "blocks" or outward == "blocks") and other_key not in original_keys:
-                        initial_linked_keys.add(other_key)
+            # Normalize names
+            name = (lt.name or "").lower()
+            outward = (lt.outward or "").lower()
+            inward = (lt.inward or "").lower()
 
-                # Check for inward blocking relationships
-                if hasattr(link, "inwardIssue") and link.inwardIssue:
-                    other_key = link.inwardIssue.key
-                    if (name == "blocks" or inward == "is blocked by") and other_key not in original_keys:
-                        initial_linked_keys.add(other_key)
+            # Check for outward blocking relationships
+            if hasattr(link, "outwardIssue") and link.outwardIssue:
+                other_key = link.outwardIssue.key
+                if (name == "blocks" or outward == "blocks") and other_key not in original_keys:
+                    initial_linked_keys.add(other_key)
 
-            # Collect subtasks from this issue
-            subtasks = getattr(issue.fields, "subtasks", []) or []
-            for subtask in subtasks:
-                if hasattr(subtask, "key"):
-                    subtask_key = subtask.key
-                    if subtask_key not in original_keys:
-                        initial_linked_keys.add(subtask_key)
+            # Check for inward blocking relationships
+            if hasattr(link, "inwardIssue") and link.inwardIssue:
+                other_key = link.inwardIssue.key
+                if (name == "blocks" or inward == "is blocked by") and other_key not in original_keys:
+                    initial_linked_keys.add(other_key)
 
         # Recursively fetch the full dependency tree
-        linked_keys = fetch_dependency_tree(client, initial_linked_keys, original_keys)
+        linked_keys = fetch_dependency_tree(client, initial_linked_keys, original_keys,
+                                            traverse_children=child_as_blocking, max_depth=max_depth)
         sys.stderr.write(f"Fetched {len(linked_keys)} issues in dependency tree\n")
-    else:
-        # Original logic: only immediate blocking relationships
-        for issue in fetched:
-            key = issue.key
-            links = getattr(issue.fields, "issuelinks", []) or []
-            for link in links:
-                lt = getattr(link, "type", None)
-                if not lt:
-                    continue
 
-                # Normalize names, Jira typically has name="Blocks", outward="blocks", inward="is blocked by"
-                name = (lt.name or "").lower()
-                outward = (lt.outward or "").lower()
-                inward = (lt.inward or "").lower()
-
-                # Check for outward blocking relationships
-                if hasattr(link, "outwardIssue") and link.outwardIssue:
-                    other_key = link.outwardIssue.key
-                    if (name == "blocks" or outward == "blocks") and other_key not in original_keys:
-                        linked_keys.add(other_key)
-
-                # Check for inward blocking relationships
-                if hasattr(link, "inwardIssue") and link.inwardIssue:
-                    other_key = link.inwardIssue.key
-                    if (name == "blocks" or inward == "is blocked by") and other_key not in original_keys:
-                        linked_keys.add(other_key)
-
-            # Collect subtasks from this issue
-            subtasks = getattr(issue.fields, "subtasks", []) or []
-            for subtask in subtasks:
-                if hasattr(subtask, "key"):
-                    subtask_key = subtask.key
-                    if subtask_key not in original_keys:
-                        linked_keys.add(subtask_key)
-    
     # Fetch details for linked issues
     linked_issues = []
     if linked_keys:
@@ -365,52 +309,17 @@ def api_search(
                         edges_set.add((other_key, key, "blocks"))
 
         # Build edges from subtasks (subtask -> parent means subtask blocks parent)
-        subtasks = getattr(issue.fields, "subtasks", []) or []
-        for subtask in subtasks:
-            if hasattr(subtask, "key"):
-                subtask_key = subtask.key
-                if key in nodes_by_key and subtask_key in nodes_by_key:
-                    edges_set.add((subtask_key, key, "subtask"))
-
-    # Add child-as-blocking relationships if enabled
-    if child_as_blocking:
-        for issue in all_issues:
-            key = issue.key
-            links = getattr(issue.fields, "issuelinks", []) or []
-            for link in links:
-                lt = getattr(link, "type", None)
-                if not lt:
-                    continue
-
-                # Normalize names for parent/child relationships
-                name = (lt.name or "").lower()
-                outward = (lt.outward or "").lower()
-                inward = (lt.inward or "").lower()
-
-                # Check for child -> parent relationships
-                # Common Jira parent/child link types: "subtask", "is a subtask of", "child of", etc.
-                is_child_relationship = (
-                    "subtask" in name or "child" in name or
-                    "subtask" in outward or "child" in outward or
-                    "parent" in inward or "is parent of" in inward
-                )
-
-                if is_child_relationship:
-                    # link.outwardIssue exists -> this issue (child) -> outwardIssue (parent)
-                    if hasattr(link, "outwardIssue") and link.outwardIssue:
-                        parent_key = link.outwardIssue.key
-                        if key in nodes_by_key and parent_key in nodes_by_key:
-                            # Child blocks parent
-                            edges_set.add((key, parent_key, "child-blocks"))
-
-                    # link.inwardIssue exists -> inwardIssue (child) -> this issue (parent)
-                    if hasattr(link, "inwardIssue") and link.inwardIssue:
-                        child_key = link.inwardIssue.key
-                        if key in nodes_by_key and child_key in nodes_by_key:
-                            # Child blocks parent
-                            edges_set.add((child_key, key, "child-blocks"))
+        if child_as_blocking:
+            subtasks = getattr(issue.fields, "subtasks", []) or []
+            for subtask in subtasks:
+                if hasattr(subtask, "key"):
+                    subtask_key = subtask.key
+                    if key in nodes_by_key and subtask_key in nodes_by_key:
+                        edges_set.add((subtask_key, key, "subtask"))
 
     edges = [{"source": s, "target": t, "label": lbl} for (s, t, lbl) in edges_set]
+
+    sys.stdout.write(f"Edges: {edges}\n")
 
     return JSONResponse({"nodes": list(nodes_by_key.values()), "edges": edges})
 
