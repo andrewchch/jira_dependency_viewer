@@ -89,44 +89,9 @@ def get_cached_issue(issue_key: str, fields: str = JIRA_FIELDS) -> Optional[Dict
         client = jira_client()
         issue = client.issue(issue_key, fields=fields)
         
-        # Convert JIRA issue to serializable dict
-        issue_data = {
-            "key": issue.key,
-            "fields": {}
-        }
-        
-        # Extract field data that we need
-        for field_name in fields.split(","):
-            field_name = field_name.strip()
-            if hasattr(issue.fields, field_name):
-                field_value = getattr(issue.fields, field_name)
-                if field_value is not None:
-                    # Handle special object types
-                    if hasattr(field_value, '__dict__'):
-                        if hasattr(field_value, 'name'):  # Status, IssuType, etc.
-                            issue_data["fields"][field_name] = {"name": field_value.name}
-                        elif hasattr(field_value, 'key'):  # Linked issues
-                            issue_data["fields"][field_name] = {"key": field_value.key}
-                        else:
-                            # Try to serialize as dict
-                            try:
-                                issue_data["fields"][field_name] = field_value.__dict__
-                            except:
-                                issue_data["fields"][field_name] = str(field_value)
-                    elif isinstance(field_value, list):
-                        # Handle lists (like issuelinks, subtasks)
-                        serialized_list = []
-                        for item in field_value:
-                            if hasattr(item, '__dict__'):
-                                try:
-                                    serialized_list.append(item.__dict__)
-                                except:
-                                    serialized_list.append(str(item))
-                            else:
-                                serialized_list.append(item)
-                        issue_data["fields"][field_name] = serialized_list
-                    else:
-                        issue_data["fields"][field_name] = field_value
+        # Use the raw JSON data from JIRA API instead of manual serialization
+        # This avoids serialization issues with non-scalar keys and complex objects
+        issue_data = issue.raw
         
         # Cache the result
         cache.set_issue(issue_key, issue_data)
