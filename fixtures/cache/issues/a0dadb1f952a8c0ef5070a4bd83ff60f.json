@@ -1,0 +1,191 @@
+{
+  "data": {
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "id": "10350",
+    "self": "https://andrewjgroom.atlassian.net/rest/api/2/issue/10350",
+    "key": "DVTP-2",
+    "fields": {
+      "customfield_10016": null,
+      "summary": "Ticket B",
+      "customfield_10005": null,
+      "issuetype": {
+        "self": "https://andrewjgroom.atlassian.net/rest/api/2/issuetype/10001",
+        "id": "10001",
+        "description": "Functionality or a feature expressed as a user goal.",
+        "iconUrl": "https://andrewjgroom.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10315?size=medium",
+        "name": "Story",
+        "subtask": false,
+        "avatarId": 10315,
+        "hierarchyLevel": 0
+      },
+      "subtasks": [],
+      "duedate": null,
+      "issuelinks": [
+        {
+          "id": "10171",
+          "self": "https://andrewjgroom.atlassian.net/rest/api/2/issueLink/10171",
+          "type": {
+            "id": "10000",
+            "name": "Blocks",
+            "inward": "is blocked by",
+            "outward": "blocks",
+            "self": "https://andrewjgroom.atlassian.net/rest/api/2/issueLinkType/10000"
+          },
+          "inwardIssue": {
+            "id": "10349",
+            "key": "DVTP-1",
+            "self": "https://andrewjgroom.atlassian.net/rest/api/2/issue/10349",
+            "fields": {
+              "summary": "Ticket A",
+              "status": {
+                "self": "https://andrewjgroom.atlassian.net/rest/api/2/status/10000",
+                "description": "",
+                "iconUrl": "https://andrewjgroom.atlassian.net/",
+                "name": "Backlog",
+                "id": "10000",
+                "statusCategory": {
+                  "self": "https://andrewjgroom.atlassian.net/rest/api/2/statuscategory/2",
+                  "id": 2,
+                  "key": "new",
+                  "colorName": "blue-gray",
+                  "name": "To Do"
+                }
+              },
+              "priority": {
+                "self": "https://andrewjgroom.atlassian.net/rest/api/2/priority/3",
+                "iconUrl": "https://andrewjgroom.atlassian.net/images/icons/priorities/medium_new.svg",
+                "name": "Medium",
+                "id": "3"
+              },
+              "issuetype": {
+                "self": "https://andrewjgroom.atlassian.net/rest/api/2/issuetype/10001",
+                "id": "10001",
+                "description": "Functionality or a feature expressed as a user goal.",
+                "iconUrl": "https://andrewjgroom.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10315?size=medium",
+                "name": "Story",
+                "subtask": false,
+                "avatarId": 10315,
+                "hierarchyLevel": 0
+              }
+            }
+          }
+        },
+        {
+          "id": "10172",
+          "self": "https://andrewjgroom.atlassian.net/rest/api/2/issueLink/10172",
+          "type": {
+            "id": "10000",
+            "name": "Blocks",
+            "inward": "is blocked by",
+            "outward": "blocks",
+            "self": "https://andrewjgroom.atlassian.net/rest/api/2/issueLinkType/10000"
+          },
+          "outwardIssue": {
+            "id": "10351",
+            "key": "DVTP-3",
+            "self": "https://andrewjgroom.atlassian.net/rest/api/2/issue/10351",
+            "fields": {
+              "summary": "Ticket C",
+              "status": {
+                "self": "https://andrewjgroom.atlassian.net/rest/api/2/status/10000",
+                "description": "",
+                "iconUrl": "https://andrewjgroom.atlassian.net/",
+                "name": "Backlog",
+                "id": "10000",
+                "statusCategory": {
+                  "self": "https://andrewjgroom.atlassian.net/rest/api/2/statuscategory/2",
+                  "id": 2,
+                  "key": "new",
+                  "colorName": "blue-gray",
+                  "name": "To Do"
+                }
+              },
+              "priority": {
+                "self": "https://andrewjgroom.atlassian.net/rest/api/2/priority/3",
+                "iconUrl": "https://andrewjgroom.atlassian.net/images/icons/priorities/medium_new.svg",
+                "name": "Medium",
+                "id": "3"
+              },
+              "issuetype": {
+                "self": "https://andrewjgroom.atlassian.net/rest/api/2/issuetype/10001",
+                "id": "10001",
+                "description": "Functionality or a feature expressed as a user goal.",
+                "iconUrl": "https://andrewjgroom.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10315?size=medium",
+                "name": "Story",
+                "subtask": false,
+                "avatarId": 10315,
+                "hierarchyLevel": 0
+              }
+            }
+          }
+        },
+        {
+          "id": "10173",
+          "self": "https://andrewjgroom.atlassian.net/rest/api/2/issueLink/10173",
+          "type": {
+            "id": "10000",
+            "name": "Blocks",
+            "inward": "is blocked by",
+            "outward": "blocks",
+            "self": "https://andrewjgroom.atlassian.net/rest/api/2/issueLinkType/10000"
+          },
+          "outwardIssue": {
+            "id": "10352",
+            "key": "DVTP-4",
+            "self": "https://andrewjgroom.atlassian.net/rest/api/2/issue/10352",
+            "fields": {
+              "summary": "Ticket D",
+              "status": {
+                "self": "https://andrewjgroom.atlassian.net/rest/api/2/status/10000",
+                "description": "",
+                "iconUrl": "https://andrewjgroom.atlassian.net/",
+                "name": "Backlog",
+                "id": "10000",
+                "statusCategory": {
+                  "self": "https://andrewjgroom.atlassian.net/rest/api/2/statuscategory/2",
+                  "id": 2,
+                  "key": "new",
+                  "colorName": "blue-gray",
+                  "name": "To Do"
+                }
+              },
+              "priority": {
+                "self": "https://andrewjgroom.atlassian.net/rest/api/2/priority/3",
+                "iconUrl": "https://andrewjgroom.atlassian.net/images/icons/priorities/medium_new.svg",
+                "name": "Medium",
+                "id": "3"
+              },
+              "issuetype": {
+                "self": "https://andrewjgroom.atlassian.net/rest/api/2/issuetype/10001",
+                "id": "10001",
+                "description": "Functionality or a feature expressed as a user goal.",
+                "iconUrl": "https://andrewjgroom.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10315?size=medium",
+                "name": "Story",
+                "subtask": false,
+                "avatarId": 10315,
+                "hierarchyLevel": 0
+              }
+            }
+          }
+        }
+      ],
+      "status": {
+        "self": "https://andrewjgroom.atlassian.net/rest/api/2/status/10000",
+        "description": "",
+        "iconUrl": "https://andrewjgroom.atlassian.net/",
+        "name": "Backlog",
+        "id": "10000",
+        "statusCategory": {
+          "self": "https://andrewjgroom.atlassian.net/rest/api/2/statuscategory/2",
+          "id": 2,
+          "key": "new",
+          "colorName": "blue-gray",
+          "name": "To Do"
+        }
+      },
+      "customfield_10015": null
+    }
+  },
+  "cached_at": "2025-09-22T17:00:43.337185",
+  "expires_at": "2025-09-22T18:00:43.337171"
+}

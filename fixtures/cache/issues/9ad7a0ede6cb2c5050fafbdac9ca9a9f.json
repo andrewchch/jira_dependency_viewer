@@ -1,0 +1,43 @@
+{
+  "data": {
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "id": "10383",
+    "self": "https://andrewjgroom.atlassian.net/rest/api/2/issue/10383",
+    "key": "DVTP-8",
+    "fields": {
+      "customfield_10016": null,
+      "summary": "Subtask of Ticket A",
+      "customfield_10005": null,
+      "issuetype": {
+        "self": "https://andrewjgroom.atlassian.net/rest/api/2/issuetype/10003",
+        "id": "10003",
+        "description": "A small piece of work that's part of a larger task.",
+        "iconUrl": "https://andrewjgroom.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10316?size=medium",
+        "name": "Sub-task",
+        "subtask": true,
+        "avatarId": 10316,
+        "hierarchyLevel": -1
+      },
+      "subtasks": [],
+      "duedate": null,
+      "issuelinks": [],
+      "status": {
+        "self": "https://andrewjgroom.atlassian.net/rest/api/2/status/10000",
+        "description": "",
+        "iconUrl": "https://andrewjgroom.atlassian.net/",
+        "name": "Backlog",
+        "id": "10000",
+        "statusCategory": {
+          "self": "https://andrewjgroom.atlassian.net/rest/api/2/statuscategory/2",
+          "id": 2,
+          "key": "new",
+          "colorName": "blue-gray",
+          "name": "To Do"
+        }
+      },
+      "customfield_10015": null
+    }
+  },
+  "cached_at": "2025-09-22T17:00:47.319023",
+  "expires_at": "2025-09-22T18:00:47.319013"
+}

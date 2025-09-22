@@ -1,0 +1,147 @@
+{
+  "data": {
+    "nodes": [
+      {
+        "id": "DVTP-3",
+        "key": "DVTP-3",
+        "summary": "Ticket C",
+        "status": "Backlog",
+        "start": "-",
+        "end": "-",
+        "story_points": null,
+        "url": "https://andrewjgroom.atlassian.net/browse/DVTP-3",
+        "isOriginal": false,
+        "isHighlighted": false
+      },
+      {
+        "id": "DVTP-4",
+        "key": "DVTP-4",
+        "summary": "Ticket D",
+        "status": "Backlog",
+        "start": "-",
+        "end": "-",
+        "story_points": null,
+        "url": "https://andrewjgroom.atlassian.net/browse/DVTP-4",
+        "isOriginal": false,
+        "isHighlighted": false
+      },
+      {
+        "id": "DVTP-7",
+        "key": "DVTP-7",
+        "summary": "Ticket G",
+        "status": "Backlog",
+        "start": "-",
+        "end": "-",
+        "story_points": null,
+        "url": "https://andrewjgroom.atlassian.net/browse/DVTP-7",
+        "isOriginal": false,
+        "isHighlighted": false
+      },
+      {
+        "id": "DVTP-6",
+        "key": "DVTP-6",
+        "summary": "Ticket F",
+        "status": "Backlog",
+        "start": "-",
+        "end": "-",
+        "story_points": null,
+        "url": "https://andrewjgroom.atlassian.net/browse/DVTP-6",
+        "isOriginal": false,
+        "isHighlighted": false
+      },
+      {
+        "id": "DVTP-8",
+        "key": "DVTP-8",
+        "summary": "Subtask of Ticket A",
+        "status": "Backlog",
+        "start": "-",
+        "end": "-",
+        "story_points": null,
+        "url": "https://andrewjgroom.atlassian.net/browse/DVTP-8",
+        "isOriginal": false,
+        "isHighlighted": false
+      },
+      {
+        "id": "DVTP-2",
+        "key": "DVTP-2",
+        "summary": "Ticket B",
+        "status": "Backlog",
+        "start": "-",
+        "end": "-",
+        "story_points": null,
+        "url": "https://andrewjgroom.atlassian.net/browse/DVTP-2",
+        "isOriginal": false,
+        "isHighlighted": false
+      },
+      {
+        "id": "DVTP-1",
+        "key": "DVTP-1",
+        "summary": "Ticket A",
+        "status": "Backlog",
+        "start": "-",
+        "end": "-",
+        "story_points": null,
+        "url": "https://andrewjgroom.atlassian.net/browse/DVTP-1",
+        "isOriginal": false,
+        "isHighlighted": false
+      },
+      {
+        "id": "DVTP-5",
+        "key": "DVTP-5",
+        "summary": "Ticket E",
+        "status": "Backlog",
+        "start": "-",
+        "end": "-",
+        "story_points": null,
+        "url": "https://andrewjgroom.atlassian.net/browse/DVTP-5",
+        "isOriginal": false,
+        "isHighlighted": false
+      }
+    ],
+    "edges": [
+      {
+        "source": "DVTP-8",
+        "target": "DVTP-1",
+        "label": "subtask"
+      },
+      {
+        "source": "DVTP-1",
+        "target": "DVTP-2",
+        "label": "blocks"
+      },
+      {
+        "source": "DVTP-1",
+        "target": "DVTP-5",
+        "label": "blocks"
+      },
+      {
+        "source": "DVTP-5",
+        "target": "DVTP-7",
+        "label": "blocks"
+      },
+      {
+        "source": "DVTP-2",
+        "target": "DVTP-3",
+        "label": "blocks"
+      },
+      {
+        "source": "DVTP-4",
+        "target": "DVTP-5",
+        "label": "blocks"
+      },
+      {
+        "source": "DVTP-5",
+        "target": "DVTP-6",
+        "label": "blocks"
+      },
+      {
+        "source": "DVTP-2",
+        "target": "DVTP-4",
+        "label": "blocks"
+      }
+    ],
+    "jql": "issuekey = DVTP-1"
+  },
+  "cached_at": "2025-09-22T17:00:47.325595",
+  "expires_at": "2025-09-22T18:00:47.325586"
+}
