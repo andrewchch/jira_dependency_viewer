@@ -149,6 +149,56 @@ The application includes a local file-based cache to improve performance and ena
 - JSON format for human-readable cache files
 - Automatic cleanup of expired and corrupted cache entries
 
+## Testing
+
+The project includes unit tests to ensure functionality and reliability of the caching system.
+
+### Running Unit Tests
+
+You can run the unit tests in several ways:
+
+#### Using Python's unittest module (recommended):
+```bash
+python -m unittest test_cache.py -v
+```
+
+#### Using test discovery to run all tests:
+```bash
+python -m unittest discover -v
+```
+
+#### Running the test file directly:
+```bash
+python test_cache.py
+```
+
+### Test Coverage
+
+The current test suite includes:
+- Cache initialization and directory structure
+- Issue caching (set/get operations)
+- Search result caching
+- Cache expiration and TTL handling
+- Cache statistics and management
+- Search hash generation
+- Cache clearing functionality
+- Error handling for invalid cache files
+- Path safety and security
+- Fixture data loading for testing
+
+### Running Tests Before Contributing
+
+Before submitting any changes, please ensure all tests pass:
+
+```bash
+# Run all tests with verbose output
+python -m unittest test_cache.py -v
+
+# Ensure all 11 tests pass
+```
+
+All tests should complete successfully with an "OK" status.
+
 ## Architecture
 
 ### Backend (FastAPI)
@@ -276,7 +326,7 @@ To find custom field IDs in your Jira instance:
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test thoroughly
+4. Test thoroughly (see [Testing](#testing) section for running unit tests)
 5. Submit a pull request
 
 ## License
