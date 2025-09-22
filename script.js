@@ -106,6 +106,25 @@ function buildCy() {
           label: 'data(label)'
         }
       },
+      {
+        selector: 'edge[label = "child-blocks"]',
+        style: {
+          width: 3,
+          'curve-style': 'unbundled-bezier',
+          'control-point-distance': 40,
+          'target-arrow-shape': 'triangle',
+          'target-arrow-color': '#ff6b35',
+          'line-color': '#ff6b35',
+          'line-style': 'dashed',
+          'edge-text-rotation': 'autorotate',
+          'font-size': 11,
+          'color': '#ff6b35',
+          'text-background-color': '#fff',
+          'text-background-opacity': 1,
+          'text-background-padding': 2,
+          label: 'data(label)'
+        }
+      },
       { selector: 'node:hover', style: { 'overlay-opacity': 0, 'cursor': 'pointer' } }
     ],
     wheelSensitivity: 0.2
@@ -333,12 +352,14 @@ async function doSearch() {
     const maxResults = document.getElementById('maxResults').value || '50';
     const showDependencyTree = document.getElementById('showDependencyTree').checked;
     const layoutName = document.getElementById('layout').value;
+    const childAsBlocking = document.getElementById('childAsBlocking').checked;
 
     // Save current form values to cookies
     saveFormValueToCookie('jql');
     saveFormValueToCookie('highlightJql');
     saveFormValueToCookie('maxResults');
     saveFormValueToCookie('layout');
+    saveFormValueToCookie('childAsBlocking');
     saveFormValueToCookie('showDependencyTree');
 
     const params = { 
@@ -348,6 +369,7 @@ async function doSearch() {
     
     if (jql) params.jql = jql;
     if (highlightJql) params.highlight_jql = highlightJql;
+    if (childAsBlocking) params.child_as_blocking = 'true';
 
     const graph = await fetchGraph(params);
 
@@ -382,6 +404,7 @@ document.getElementById('jql').addEventListener('input', () => saveFormValueToCo
 document.getElementById('highlightJql').addEventListener('input', () => saveFormValueToCookie('highlightJql'));
 document.getElementById('maxResults').addEventListener('input', () => saveFormValueToCookie('maxResults'));
 document.getElementById('showDependencyTree').addEventListener('change', () => saveFormValueToCookie('showDependencyTree'));
+document.getElementById('childAsBlocking').addEventListener('change', () => saveFormValueToCookie('childAsBlocking'));
 
 // Load saved form values from cookies on page load
 function loadSavedFormValues() {
@@ -390,6 +413,7 @@ function loadSavedFormValues() {
   loadFormValueFromCookie('layout');
   loadFormValueFromCookie('maxResults');
   loadFormValueFromCookie('showDependencyTree');
+  loadFormValueFromCookie('childAsBlocking');
 }
 
 // Boot
